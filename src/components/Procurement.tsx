@@ -353,7 +353,7 @@ function BulkScannerInterface({
     <div className="space-y-6">
       {/* Drop Zone */}
       <div 
-        className={`relative border-2 border-dashed rounded-2xl p-12 text-center transition-all ${
+        className={`relative border-2 border-dashed rounded-2xl p-6 sm:p-12 text-center transition-all overflow-hidden ${
           dragActive 
             ? 'border-[#961b2b] bg-[#961b2b]/5' 
             : 'border-gray-200 bg-[#f2f2f2]/90 hover:border-gray-300'
@@ -373,18 +373,18 @@ function BulkScannerInterface({
         
         <div className="flex flex-col items-center justify-center gap-4 pointer-events-none">
           {isScanning ? (
-            <div className="flex flex-col items-center gap-3">
-              <Loader2 className="w-12 h-12 text-[#961b2b] animate-spin" />
-              <p className="text-lg font-medium text-gray-900">AI Vision Scanner analyzing cards...</p>
+            <div className="flex flex-col items-center gap-2 sm:gap-3">
+              <Loader2 className="w-10 h-10 sm:w-12 sm:h-12 text-[#961b2b] animate-spin" />
+              <p className="text-base sm:text-lg font-medium text-gray-900 px-2 text-center">AI Vision Scanner analyzing cards...</p>
             </div>
           ) : (
             <>
-              <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
-                <Upload className="w-8 h-8 text-gray-500" />
+              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gray-100 flex items-center justify-center">
+                <Upload className="w-6 h-6 sm:w-8 sm:h-8 text-gray-500" />
               </div>
-              <div>
-                <p className="text-lg font-medium text-gray-900">Drag & Drop Card or Slab Images Here</p>
-                <p className="text-sm text-gray-500 mt-1">Bulk Upload Supported • JPG, PNG, WEBP</p>
+              <div className="px-2">
+                <p className="text-base sm:text-lg font-medium text-gray-900 leading-tight">Drag & Drop Card or Slab Images Here</p>
+                <p className="text-xs sm:text-sm text-gray-500 mt-2">Bulk Upload Supported • JPG, PNG, WEBP</p>
               </div>
             </>
           )}
@@ -468,7 +468,7 @@ function BulkScannerInterface({
                 </div>
 
                 {/* Editable Fields */}
-                <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="space-y-1">
                     <label className="text-[10px] uppercase font-semibold text-gray-500">Item Name</label>
                     <input 
@@ -856,8 +856,8 @@ function ManualEntryForm({
         </div>
 
       {/* Core Info Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 content-end">
-        <div className="flex flex-col gap-1 sm:col-span-2 relative">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 content-end">
+        <div className="flex flex-col gap-1 md:col-span-2 relative">
           <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Item Name</label>
           <div className="relative">
             <input
@@ -904,7 +904,7 @@ function ManualEntryForm({
           </div>
           {errors.itemName && <span className="absolute -bottom-4 right-0 text-[10px] font-bold text-[#961b2b]">REQUIRED</span>}
         </div>
-        <div className={`flex flex-col gap-1 relative ${category === 'Sealed' ? 'sm:col-span-2' : ''}`}>
+        <div className={`flex flex-col gap-1 relative ${category === 'Sealed' ? 'md:col-span-2' : ''}`}>
           <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Set Name</label>
           <input
             type="text"
@@ -1088,7 +1088,7 @@ function ManualEntryForm({
       </AnimatePresence>
 
       {/* Financial Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-[#e0e0e0] pt-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-[#e0e0e0] pt-4">
         <div className="flex flex-col gap-1 relative">
           <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Cost Basis (Amt Paid)</label>
           <CurrencyInput 

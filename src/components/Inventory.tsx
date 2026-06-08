@@ -608,8 +608,8 @@ function EditDetailsModal({ item, onClose, onSave }: { item: InventoryItem; onCl
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 content-end">
-              <div className="space-y-1 sm:col-span-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 content-end">
+              <div className="space-y-1 md:col-span-2">
                 <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Item Name</label>
                 <input
                   type="text"
@@ -751,7 +751,7 @@ function EditDetailsModal({ item, onClose, onSave }: { item: InventoryItem; onCl
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-[#e0e0e0] pt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-[#e0e0e0] pt-4">
             <div className="space-y-1">
               <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Cost Basis</label>
               <CurrencyInput 

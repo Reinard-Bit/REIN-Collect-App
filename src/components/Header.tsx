@@ -1,9 +1,17 @@
-import { Bell, Search, Camera } from 'lucide-react';
+import { Bell, Search, Camera, Menu } from 'lucide-react';
 
-export function Header({ onOpenScanner }: { onOpenScanner?: () => void }) {
+export function Header({ onOpenScanner, onMenuClick }: { onOpenScanner?: () => void; onMenuClick?: () => void }) {
   return (
-    <header className="h-16 border-b border-gray-200 flex items-center justify-between px-6 bg-[#f2f2f2]/80 backdrop-blur-md sticky top-0 z-10">
-      <div className="flex items-center gap-4 w-96">
+    <header className="h-16 border-b border-gray-200 flex items-center justify-between px-4 md:px-6 bg-[#f2f2f2]/80 backdrop-blur-md sticky top-0 z-10 shrink-0">
+      <div className="flex items-center gap-3 md:gap-4 md:w-96 flex-1 md:flex-initial">
+        {onMenuClick && (
+          <button 
+            onClick={onMenuClick}
+            className="md:hidden p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-200 transition-colors"
+          >
+            <Menu size={20} />
+          </button>
+        )}
         <div className="relative flex-1">
           <Search
             className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"

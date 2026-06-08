@@ -7,33 +7,54 @@ import {
   Settings,
   LogOut,
   BrainCircuit,
+  X
 } from 'lucide-react';
 
-export function Sidebar({ currentView, onViewChange }: { currentView: string, onViewChange: (view: string) => void }) {
+interface SidebarProps {
+  currentView: string;
+  onViewChange: (view: string) => void;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export function Sidebar({ currentView, onViewChange, isOpen, onClose }: SidebarProps) {
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
-      <div className="p-6 flex items-center gap-3">
-        <div className="w-8 h-8 rounded bg-[#961b2b] flex items-center justify-center">
-          <span className="font-bold text-gray-900 text-lg">R</span>
+    <>
+      <div 
+        className={`fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-40 md:hidden transition-opacity ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        onClick={onClose}
+      />
+      <aside 
+        className={`fixed md:static inset-y-0 left-0 w-64 bg-white border-r border-gray-200 flex flex-col z-50 transform md:transform-none transition-transform duration-200 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
+      >
+        <div className="p-6 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded bg-[#961b2b] flex items-center justify-center">
+              <span className="font-bold text-gray-900 text-lg flex-shrink-0">R</span>
+            </div>
+            <h1 className="text-xl font-bold tracking-tight text-gray-900 truncate">
+              REIN Collects
+            </h1>
+          </div>
+          <button onClick={onClose} className="md:hidden p-1 text-gray-400 hover:text-gray-800">
+            <X size={20} />
+          </button>
         </div>
-        <h1 className="text-xl font-bold tracking-tight text-gray-900">
-          REIN Collects
-        </h1>
-      </div>
 
-      <nav className="flex-1 px-4 space-y-2 mt-4">
-        <NavItem icon={<LayoutDashboard size={20} />} label="Dashboard" active={currentView === 'dashboard'} onClick={() => onViewChange('dashboard')} />
-        <NavItem icon={<Package size={20} />} label="Inventory" active={currentView === 'inventory'} onClick={() => onViewChange('inventory')} />
-        <NavItem icon={<ShoppingCart size={20} />} label="Procurement" active={currentView === 'procurement'} onClick={() => onViewChange('procurement')} />
-        <NavItem icon={<TrendingUp size={20} />} label="Transactions" active={currentView === 'transactions'} onClick={() => onViewChange('transactions')} />
-        <NavItem icon={<BrainCircuit size={20} />} label="AI Insights" active={currentView === 'insights'} onClick={() => onViewChange('insights')} />
-      </nav>
+        <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto">
+          <NavItem icon={<LayoutDashboard size={20} />} label="Dashboard" active={currentView === 'dashboard'} onClick={() => onViewChange('dashboard')} />
+          <NavItem icon={<Package size={20} />} label="Inventory" active={currentView === 'inventory'} onClick={() => onViewChange('inventory')} />
+          <NavItem icon={<ShoppingCart size={20} />} label="Procurement" active={currentView === 'procurement'} onClick={() => onViewChange('procurement')} />
+          <NavItem icon={<TrendingUp size={20} />} label="Transactions" active={currentView === 'transactions'} onClick={() => onViewChange('transactions')} />
+          <NavItem icon={<BrainCircuit size={20} />} label="AI Insights" active={currentView === 'insights'} onClick={() => onViewChange('insights')} />
+        </nav>
 
-      <div className="p-4 border-t border-gray-200 space-y-2">
-        <NavItem icon={<Settings size={20} />} label="Settings" />
-        <NavItem icon={<LogOut size={20} />} label="Logout" />
-      </div>
-    </aside>
+        <div className="p-4 border-t border-gray-200 space-y-2">
+          <NavItem icon={<Settings size={20} />} label="Settings" />
+          <NavItem icon={<LogOut size={20} />} label="Logout" />
+        </div>
+      </aside>
+    </>
   );
 }
 

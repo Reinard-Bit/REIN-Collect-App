@@ -60,6 +60,7 @@ export interface CatalogItem {
 export default function App() {
   const [currentView, setCurrentView] = useState('insights');
   const [isGlobalScannerOpen, setIsGlobalScannerOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [scannedSerial, setScannedSerial] = useState<string | null>(null);
   
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
@@ -290,11 +291,22 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen bg-[#f2f2f2] text-gray-900 font-sans overflow-hidden">
-      <Sidebar currentView={currentView} onViewChange={setCurrentView} />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header onOpenScanner={() => setIsGlobalScannerOpen(true)} />
-        <main className="flex-1 overflow-y-auto p-6">
+    <div className="flex h-screen bg-[#f2f2f2] text-gray-900 font-sans overflow-hidden w-full">
+      <Sidebar 
+        currentView={currentView} 
+        onViewChange={(view) => {
+          setCurrentView(view);
+          setIsMobileMenuOpen(false);
+        }} 
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+      />
+      <div className="flex-1 flex flex-col overflow-hidden w-full relative">
+        <Header 
+          onOpenScanner={() => setIsGlobalScannerOpen(true)} 
+          onMenuClick={() => setIsMobileMenuOpen(true)}
+        />
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 w-full">
           {currentView === 'dashboard' && <Dashboard inventory={inventoryItems} transactions={transactions} onAddTransaction={handleAddTransaction} onUpdateInventory={handleUpdateInventory} outOfPocketCapital={outOfPocketCapital} cashReserve={cashReserve} onInjectCapital={handleInjectCapital} />}
           {currentView === 'inventory' && (
              <Inventory 
