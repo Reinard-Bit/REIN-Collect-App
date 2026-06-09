@@ -23,6 +23,7 @@ export function NewSaleDrawer({
 }: NewSaleDrawerProps) {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isProcessingScan, setIsProcessingScan] = useState(false);
+  const [scanSuccessItem, setScanSuccessItem] = useState<any>(null);
   const scanLockRef = useRef(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState<{ id: string; name: string; price: number; cost: number; quantity: number, maxQuantity: number, category: string }[]>(() => {
@@ -65,6 +66,10 @@ export function NewSaleDrawer({
     if (foundItem) {
       if (foundItem.quantity > 0) {
         addToCart(foundItem);
+        setScanSuccessItem(foundItem);
+        setTimeout(() => {
+          setScanSuccessItem(null);
+        }, 1500);
       } else {
         setErrorMsg(`Item ${foundItem.name} is out of stock.`);
       }
@@ -365,6 +370,7 @@ export function NewSaleDrawer({
         onClose={() => setIsScannerOpen(false)} 
         onScan={handleScan} 
         continuous={true}
+        scanSuccessItem={scanSuccessItem}
       />
     </>
   );
