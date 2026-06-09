@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -12,6 +12,7 @@ import { Procurement } from './components/Procurement';
 import { ProcurementHistory } from './components/ProcurementHistory';
 import { Transactions } from './components/Transactions';
 import { AiInsights } from './components/AiInsights';
+import { Settings } from './components/Settings';
 import { BarcodeScanner } from './components/BarcodeScanner';
 
 export interface InventoryBatch {
@@ -38,6 +39,7 @@ export interface InventoryItem {
   rarity?: string;
   language?: string;
   batches?: InventoryBatch[];
+  acquisitionDate?: string;
 }
 
 export interface ProcurementRecord {
@@ -61,7 +63,10 @@ export default function App() {
   const [currentView, setCurrentView] = useState('insights');
   const [isGlobalScannerOpen, setIsGlobalScannerOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [scannedSerial, setScannedSerial] = useState<string | null>(null);
+  
+  const [scannedProcurementEvent, setScannedProcurementEvent] = useState<{code: string, timestamp: number} | null>(null);
+  const [scannedSellEvent, setScannedSellEvent] = useState<{code: string, timestamp: number} | null>(null);
+  const scanLockRef = useRef(false);
   
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   
@@ -110,6 +115,28 @@ export default function App() {
     }
   });
 
+  const [capitalInjections, setCapitalInjections] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem('bandit_capital_injections');
+      const parsed = saved ? JSON.parse(saved) : [];
+      return parsed;
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    if (outOfPocketCapital > 0 && capitalInjections.length === 0) {
+      setCapitalInjections([
+        {
+          id: 'INJ-INITIAL',
+          date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+          amount: outOfPocketCapital
+        }
+      ]);
+    }
+  }, [outOfPocketCapital, capitalInjections.length]);
+
   useEffect(() => {
     localStorage.setItem('bandit_outOfPocket', outOfPocketCapital.toString());
   }, [outOfPocketCapital]);
@@ -117,6 +144,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('bandit_cashReserve', cashReserve.toString());
   }, [cashReserve]);
+
+  useEffect(() => {
+    localStorage.setItem('bandit_capital_injections', JSON.stringify(capitalInjections));
+  }, [capitalInjections]);
 
   useEffect(() => {
     localStorage.setItem('bandit_procurements', JSON.stringify(procurementRecords));
@@ -130,35 +161,45 @@ export default function App() {
     localStorage.setItem('bandit_catalog', JSON.stringify(masterCatalog));
   }, [masterCatalog]);
 
-  const handleGlobalScan = (decodedText: string) => {
-    setIsGlobalScannerOpen(false);
+  const handleScanSuccess = (decodedText: string) => {
+    if (scanLockRef.current) return;
+    scanLockRef.current = true;
     
-    // Check if the scanned serial exists in any inventory batched
+    setIsGlobalScannerOpen(false);
+    const code = decodedText.trim().toUpperCase();
+    
     let foundItemId: string | null = null;
     for (const item of inventoryItems) {
-      if (item.batches?.some(b => b.batchId === decodedText) || item.id === decodedText) {
+      const itemIdSanitized = item.id ? item.id.trim().toUpperCase() : '';
+      const matchesBatch = item.batches?.some(b => b.batchId && b.batchId.trim().toUpperCase() === code);
+      
+      if (itemIdSanitized === code || matchesBatch) {
         foundItemId = item.id;
         break;
       }
     }
 
     if (foundItemId) {
-      // Exists: open inventory mode? Or just go there.
-      // Easiest is to go to inventory view and we could highlight it, but let's just go there.
-      setCurrentView('inventory');
-      // If we wanted to trigger the modal, we could pass state down. But for now just go there.
-      // Wait, "Route to the POS Sales Cart or Quick Adjust modal." 
-      // The instructions say: "If YES (Assigned Sleeve): Route to the POS Sales Cart or Quick Adjust modal."
-      // Since POS is a drawer, and Quick Adjust is a modal in Inventory, let's just go to Inventory. 
-      // We will add a global state for the found item if needed.
+      setScannedSellEvent({ code: foundItemId, timestamp: Date.now() });
+      setCurrentView('transactions');
     } else {
-      // Empty Sleeve: open procurement
-      setScannedSerial(decodedText);
+      setScannedProcurementEvent({ code: code, timestamp: Date.now() });
       setCurrentView('procurement');
     }
+
+    setTimeout(() => {
+      scanLockRef.current = false;
+    }, 1500);
   };
 
   const handleInjectCapital = (amount: number) => {
+    const displayDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const newInjection = {
+      id: `INJ-${Date.now()}`,
+      date: displayDate,
+      amount: amount
+    };
+    setCapitalInjections(prev => [newInjection, ...prev]);
     setOutOfPocketCapital(prev => prev + amount);
     setCashReserve(prev => prev + amount);
   };
@@ -183,7 +224,7 @@ export default function App() {
     });
 
     setInventoryItems(prev => {
-      const displayDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      const displayDate = newItem.acquisitionDate || new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
       const newBatch: InventoryBatch = {
         batchId: newItem.id,
         date: displayDate,
@@ -307,7 +348,19 @@ export default function App() {
           onMenuClick={() => setIsMobileMenuOpen(true)}
         />
         <main className="flex-1 overflow-y-auto p-4 md:p-6 w-full">
-          {currentView === 'dashboard' && <Dashboard inventory={inventoryItems} transactions={transactions} onAddTransaction={handleAddTransaction} onUpdateInventory={handleUpdateInventory} outOfPocketCapital={outOfPocketCapital} cashReserve={cashReserve} onInjectCapital={handleInjectCapital} />}
+          {currentView === 'dashboard' && (
+            <Dashboard 
+              inventory={inventoryItems} 
+              transactions={transactions} 
+              onAddTransaction={handleAddTransaction} 
+              onUpdateInventory={handleUpdateInventory} 
+              outOfPocketCapital={outOfPocketCapital} 
+              cashReserve={cashReserve} 
+              onInjectCapital={handleInjectCapital}
+              capitalInjections={capitalInjections}
+              procurementRecords={procurementRecords}
+            />
+          )}
           {currentView === 'inventory' && (
              <Inventory 
               items={inventoryItems} 
@@ -318,12 +371,13 @@ export default function App() {
           )}
           {currentView === 'procurement' && (
             <Procurement 
+              key={scannedProcurementEvent?.timestamp || 'procurement'}
               masterCatalog={masterCatalog}
               onAddItem={handleAddItem} 
               procurementRecords={procurementRecords}
               onAddProcurements={handleAddProcurements}
               onNavigateToHistory={() => setCurrentView('procurementHistory')}
-              initialSerialNumber={scannedSerial}
+              initialSerialNumber={scannedProcurementEvent ? scannedProcurementEvent.code : ''}
             />
           )}
           {currentView === 'procurementHistory' && (
@@ -334,20 +388,28 @@ export default function App() {
           )}
           {currentView === 'transactions' && (
             <Transactions 
+              key={scannedSellEvent?.timestamp || 'transactions'}
               inventory={inventoryItems}
               transactions={transactions}
               onAddTransaction={handleAddTransaction}
               onUpdateInventory={handleUpdateInventory}
+              initialSellItemCode={scannedSellEvent ? scannedSellEvent.code : ''}
             />
           )}
           {currentView === 'insights' && <AiInsights />}
+          {currentView === 'settings' && (
+            <Settings 
+              masterCatalog={masterCatalog}
+              onUpdateCatalog={(updated) => setMasterCatalog(updated)}
+            />
+          )}
         </main>
       </div>
 
       <BarcodeScanner 
         isOpen={isGlobalScannerOpen} 
         onClose={() => setIsGlobalScannerOpen(false)} 
-        onScan={handleGlobalScan} 
+        onScan={handleScanSuccess} 
       />
     </div>
   );

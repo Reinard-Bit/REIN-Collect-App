@@ -25,7 +25,7 @@ export function Sidebar({ currentView, onViewChange, isOpen, onClose }: SidebarP
         onClick={onClose}
       />
       <aside 
-        className={`fixed md:static inset-y-0 left-0 w-64 bg-white border-r border-gray-200 flex flex-col z-50 transform md:transform-none transition-transform duration-200 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`fixed md:static inset-y-0 left-0 w-64 bg-white border-r border-gray-200 flex flex-col z-50 md:translate-x-0 transition-transform duration-200 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         <div className="p-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -50,7 +50,7 @@ export function Sidebar({ currentView, onViewChange, isOpen, onClose }: SidebarP
         </nav>
 
         <div className="p-4 border-t border-gray-200 space-y-2">
-          <NavItem icon={<Settings size={20} />} label="Settings" />
+          <NavItem icon={<Settings size={20} />} label="Settings" active={currentView === 'settings'} onClick={() => onViewChange('settings')} />
           <NavItem icon={<LogOut size={20} />} label="Logout" />
         </div>
       </aside>

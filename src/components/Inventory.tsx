@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Search, Plus, MoreHorizontal, Filter, ChevronLeft, ChevronRight, Copy, Check, X, Image as ImageIcon, Camera, QrCode as QrCodeIcon, Printer, ChevronDown, ChevronUp } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { formatIDR } from '../utils/currency';
@@ -16,6 +16,8 @@ interface InventoryProps {
 export function Inventory({ items, onNavigateToProcurement, onUpdateItem, onDeleteItem }: InventoryProps) {
   const [activeCategory, setActiveCategory] = useState('All');
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isProcessingScan, setIsProcessingScan] = useState(false);
+  const scanLockRef = useRef(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [itemToPrint, setItemToPrint] = useState<InventoryItem | null>(null);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -45,22 +47,39 @@ export function Inventory({ items, onNavigateToProcurement, onUpdateItem, onDele
   const foilTypes = ['Non-Foil', 'Reverse Holo', 'Holo', 'Textured'];
 
   const handleScan = (decodedText: string) => {
-    const foundItem = items.find(i => 
-      i.id === decodedText || 
-      i.batches?.some((b: any) => b.batchId === decodedText) ||
-      (i.cardNumber && i.cardNumber.toLowerCase() === decodedText.toLowerCase()) ||
-      i.name.toLowerCase() === decodedText.toLowerCase()
-    );
+    if (scanLockRef.current) return;
+    scanLockRef.current = true;
+    setIsProcessingScan(true);
+
+    const sanitizedScan = decodedText.trim().toUpperCase();
+
+    // Direct, strict lookup against the sanitized scanned string
+    const foundItem = items.find(i => {
+      const itemIdSanitized = i.id ? i.id.trim().toUpperCase() : '';
+      const itemCardNumberSanitized = i.cardNumber ? i.cardNumber.trim().toUpperCase() : '';
+      const itemNameSanitized = i.name ? i.name.trim().toUpperCase() : '';
+      
+      const matchesBatch = i.batches?.some((b: any) => b.batchId && b.batchId.trim().toUpperCase() === sanitizedScan);
+
+      return itemIdSanitized === sanitizedScan || 
+             itemCardNumberSanitized === sanitizedScan ||
+             itemNameSanitized === sanitizedScan ||
+             matchesBatch;
+    });
 
     if (foundItem) {
       setStockModalItem(foundItem);
-      // Wait to close scanner so it doesn't interrupt immediate visual feedback, or just keep it open?
-      // Since they want to adjust, we should probably close scanner or let them deal with modal overlay
       setIsScannerOpen(false); 
     } else {
       setSearchQuery(decodedText);
       setIsScannerOpen(false);
     }
+
+    // Cooldown lock for 600ms
+    setTimeout(() => {
+      scanLockRef.current = false;
+      setIsProcessingScan(false);
+    }, 600);
   };
 
   const filteredItems = items.filter(item => {
@@ -75,22 +94,22 @@ export function Inventory({ items, onNavigateToProcurement, onUpdateItem, onDele
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header & Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h2 className="text-2xl font-bold tracking-tight text-gray-900">
+        <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900">
           Inventory Control
         </h2>
-        <div className="flex items-center gap-3">
-          <div className="relative w-64 sm:w-80">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-initial sm:w-80 w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by name, set, or SKU..."
-              className="w-full bg-white border border-gray-200 rounded-lg pl-10 pr-10 py-2 text-sm text-gray-800 placeholder-gray-500 focus:outline-none focus:border-[#961b2b]/50 focus:ring-1 focus:ring-[#961b2b]/50 transition-all"
+              className="w-full bg-white border border-gray-200 rounded-lg pl-10 pr-10 py-2.5 text-sm text-gray-800 placeholder-gray-500 focus:outline-none focus:border-[#961b2b]/50 focus:ring-1 focus:ring-[#961b2b]/50 transition-all min-h-[44px]"
             />
             <button 
               onClick={() => setIsScannerOpen(true)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-[#961b2b] transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-[#961b2b] transition-colors p-1"
               title="Scan Barcode"
             >
               <Camera size={18} />
@@ -98,7 +117,7 @@ export function Inventory({ items, onNavigateToProcurement, onUpdateItem, onDele
           </div>
           <button 
             onClick={onNavigateToProcurement}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[#961b2b] text-gray-900 rounded-lg hover:bg-[#961b2b]/90 shadow-[0_0_15px_rgba(150,27,43,0.3)] transition-all whitespace-nowrap"
+            className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-[#961b2b] text-gray-900 rounded-lg hover:bg-[#961b2b]/90 shadow-[0_0_15px_rgba(150,27,43,0.3)] transition-all whitespace-nowrap min-h-[44px] w-full sm:w-auto"
           >
             <Plus size={16} />
             Procure New Item
@@ -113,7 +132,7 @@ export function Inventory({ items, onNavigateToProcurement, onUpdateItem, onDele
           <span className="text-sm font-medium text-gray-700">Filters</span>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {categories.map((cat) => (
             <button
               key={cat}
@@ -145,9 +164,9 @@ export function Inventory({ items, onNavigateToProcurement, onUpdateItem, onDele
       {/* Data Table */}
       <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden flex flex-col">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm whitespace-nowrap">
+          <table className="w-full text-left text-sm block md:table">
             <thead>
-              <tr className="text-gray-500 border-b border-gray-200 bg-[#f2f2f2]/50">
+              <tr className="hidden md:table-row text-gray-500 border-b border-gray-200 bg-[#f2f2f2]/50">
                 <th className="px-6 py-4 font-medium">Item Name & Set</th>
                 <th className="px-6 py-4 font-medium">Category & Condition</th>
                 <th className="px-6 py-4 font-medium">Cert #</th>
@@ -157,10 +176,11 @@ export function Inventory({ items, onNavigateToProcurement, onUpdateItem, onDele
                 <th className="px-6 py-4 font-medium text-center">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5">
+            <tbody className="divide-y divide-white/5 md:table-row-group block w-full">
               {filteredItems.map((item) => (
                 <React.Fragment key={item.id}>
-                  <tr className="group hover:bg-white/[0.02] transition-colors border-b border-gray-100">
+                  {/* Desktop view */}
+                  <tr className="hidden md:table-row group hover:bg-white/[0.02] transition-colors border-b border-gray-100">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-4">
                         <div className="relative w-10 h-14 rounded overflow-hidden bg-[#1a1a1c] border border-gray-200 flex-shrink-0 group/img">
@@ -194,105 +214,107 @@ export function Inventory({ items, onNavigateToProcurement, onUpdateItem, onDele
                         </div>
                       </div>
                     </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-1 rounded-md bg-[#f2f2f2] border border-gray-200 text-xs text-gray-700">
-                        {item.category}
-                      </span>
-                      {item.condition !== 'N/A' && (
-                        <span className="text-xs text-gray-500">• {item.condition}</span>
-                      )}
-                      {item.foilType !== 'N/A' && (
-                        <span className="text-xs text-gray-500">• {item.foilType}</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    {item.category === 'Slab' && item.certNumber ? (
+                    <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-gray-200 text-gray-900">
-                          {item.gradingCompany}
+                        <span className="px-2 py-1 rounded-md bg-[#f2f2f2] border border-gray-200 text-xs text-gray-700">
+                          {item.category}
                         </span>
-                        <span className="font-mono text-gray-700">{item.certNumber}</span>
-                        <CopyButton text={item.certNumber} />
-                      </div>
-                    ) : (
-                      <span className="text-gray-600">—</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <span className={`font-mono font-medium ${item.quantity < 3 ? 'text-[#961b2b]' : 'text-gray-700'}`}>
-                      {item.quantity}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex flex-col items-end">
-                      <span className="font-mono text-gray-500">{formatIDR(item.costBasis)}</span>
-                      {item.quantity > 1 && <span className="text-[10px] text-gray-400 font-sans tracking-wide">(Avg)</span>}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right font-mono text-emerald-400">
-                    {formatIDR(item.currentPrice)}
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      <button 
-                        onClick={() => setStockModalItem(item)}
-                        className="p-2 text-gray-500 hover:text-[#961b2b] hover:bg-[#961b2b]/10 rounded-lg transition-colors"
-                        title="Quick Adjust Stock"
-                      >
-                        <QrCodeIcon size={16} />
-                      </button>
-                      <div className="relative">
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setActiveMenuId(activeMenuId === item.id ? null : item.id);
-                          }}
-                          className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-200 rounded-lg transition-colors" 
-                          title="More options"
-                        >
-                          <MoreHorizontal size={16} />
-                        </button>
-                        {activeMenuId === item.id && (
-                          <div 
-                            className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.1)] py-1 flex flex-col z-[100]"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <button 
-                              onClick={() => { setActiveMenuId(null); setEditModalItem(item); }}
-                              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-[#f2f2f2] transition-colors whitespace-nowrap"
-                            >
-                              Edit Details
-                            </button>
-                            <button 
-                              onClick={() => { setActiveMenuId(null); setItemToPrint(item); }}
-                              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-[#f2f2f2] transition-colors whitespace-nowrap"
-                            >
-                              Print SKU Barcode
-                            </button>
-                            <button 
-                              onClick={() => { setActiveMenuId(null); setStockModalItem(item); }}
-                              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-[#f2f2f2] transition-colors whitespace-nowrap"
-                            >
-                              Adjust Stock Level
-                            </button>
-                            <div className="my-1 border-t border-gray-100" />
-                            <button 
-                              onClick={() => { setActiveMenuId(null); handleDelete(item.id, item.name); }}
-                              className="w-full text-left px-4 py-2.5 text-sm font-medium text-[#961b2b] hover:bg-[#961b2b]/10 transition-colors whitespace-nowrap"
-                            >
-                              Delete Item
-                            </button>
-                          </div>
+                        {item.condition !== 'N/A' && (
+                          <span className="text-xs text-gray-500">• {item.condition}</span>
+                        )}
+                        {item.foilType !== 'N/A' && (
+                          <span className="text-xs text-gray-500">• {item.foilType}</span>
                         )}
                       </div>
-                    </div>
-                  </td>
+                    </td>
+                    <td className="px-6 py-4">
+                      {item.category === 'Slab' && item.certNumber ? (
+                        <div className="flex items-center gap-2">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-gray-200 text-gray-900">
+                            {item.gradingCompany}
+                          </span>
+                          <span className="font-mono text-gray-700">{item.certNumber}</span>
+                          <CopyButton text={item.certNumber} />
+                        </div>
+                      ) : (
+                        <span className="text-gray-600">—</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <span className={`font-mono font-medium ${item.quantity < 3 ? 'text-[#961b2b]' : 'text-gray-700'}`}>
+                        {item.quantity}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex flex-col items-end">
+                        <span className="font-mono text-gray-500">{formatIDR(item.costBasis)}</span>
+                        {item.quantity > 1 && <span className="text-[10px] text-gray-400 font-sans tracking-wide">(Avg)</span>}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right font-mono text-emerald-400">
+                      {formatIDR(item.currentPrice)}
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <button 
+                          onClick={() => setStockModalItem(item)}
+                          className="p-2 text-gray-500 hover:text-[#961b2b] hover:bg-[#961b2b]/10 rounded-lg transition-colors"
+                          title="Quick Adjust Stock"
+                        >
+                          <QrCodeIcon size={16} />
+                        </button>
+                        <div className="relative">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveMenuId(activeMenuId === item.id ? null : item.id);
+                            }}
+                            className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-200 rounded-lg transition-colors" 
+                            title="More options"
+                          >
+                            <MoreHorizontal size={16} />
+                          </button>
+                          {activeMenuId === item.id && (
+                            <div 
+                              className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.1)] py-1 flex flex-col z-[100]"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button 
+                                onClick={() => { setActiveMenuId(null); setEditModalItem(item); }}
+                                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-[#f2f2f2] transition-colors whitespace-nowrap"
+                              >
+                                Edit Details
+                              </button>
+                              <button 
+                                onClick={() => { setActiveMenuId(null); setItemToPrint(item); }}
+                                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-[#f2f2f2] transition-colors whitespace-nowrap"
+                              >
+                                Print SKU Barcode
+                              </button>
+                              <button 
+                                onClick={() => { setActiveMenuId(null); setStockModalItem(item); }}
+                                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-[#f2f2f2] transition-colors whitespace-nowrap"
+                              >
+                                Adjust Stock Level
+                              </button>
+                              <div className="my-1 border-t border-gray-100" />
+                              <button 
+                                onClick={() => { setActiveMenuId(null); handleDelete(item.id, item.name); }}
+                                className="w-full text-left px-4 py-2.5 text-sm font-medium text-[#961b2b] hover:bg-[#961b2b]/10 transition-colors whitespace-nowrap"
+                              >
+                                Delete Item
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
                   </tr>
+
+                  {/* Desktop sub-table expanded batches */}
                   {expandedRowIds.includes(item.id) && item.batches && item.batches.length > 0 && (
-                    <tr>
-                      <td colSpan={6} className="p-0 border-b border-gray-100">
+                    <tr className="hidden md:table-row">
+                      <td colSpan={7} className="p-0 border-b border-gray-100">
                         <div className="bg-[#f2f2f2]/80 px-10 py-4 border-l-2 border-[#961b2b]">
                           <table className="w-full text-sm">
                             <thead>
@@ -318,6 +340,151 @@ export function Inventory({ items, onNavigateToProcurement, onUpdateItem, onDele
                       </td>
                     </tr>
                   )}
+
+                  {/* Mobile Card Stack Item */}
+                  <tr className="md:hidden block w-full border-b border-gray-100 last:border-0 hover:bg-gray-50/20 transition-colors">
+                    <td className="block p-4 border-none bg-transparent w-full">
+                      <div className="flex flex-col gap-3">
+                        {/* Header: Img, Title, Options */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex gap-3">
+                            <div className="relative w-12 h-16 rounded overflow-hidden bg-gray-100 border border-gray-200 flex-shrink-0 shadow-sm">
+                              {item.imageUrl ? (
+                                <img 
+                                  src={item.imageUrl} 
+                                  alt={item.name} 
+                                  className="w-full h-full object-cover"
+                                  referrerPolicy="no-referrer"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                  <ImageIcon size={18} />
+                                </div>
+                              )}
+                            </div>
+                            <div className="space-y-0.5">
+                              <div className="font-bold text-gray-900 text-sm leading-snug break-words whitespace-normal">{item.name}</div>
+                              <div className="text-[11px] text-gray-500">
+                                {item.set} • <span className="font-mono text-gray-400">{item.id}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Options menu */}
+                          <div className="relative flex-shrink-0">
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveMenuId(activeMenuId === item.id ? null : item.id);
+                              }}
+                              className="p-1.5 text-gray-500 hover:text-gray-900 border border-gray-200 bg-gray-50 rounded-lg transition-colors" 
+                              title="More options"
+                            >
+                              <MoreHorizontal size={14} />
+                            </button>
+                            {activeMenuId === item.id && (
+                              <div 
+                                className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-xl shadow-lg py-1 flex flex-col z-[100]"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <button 
+                                  onClick={() => { setActiveMenuId(null); setEditModalItem(item); }}
+                                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-[#f2f2f2] transition-colors whitespace-nowrap"
+                                >
+                                  Edit Details
+                                </button>
+                                <button 
+                                  onClick={() => { setActiveMenuId(null); setItemToPrint(item); }}
+                                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-[#f2f2f2] transition-colors whitespace-nowrap"
+                                >
+                                  Print SKU Barcode
+                                </button>
+                                <button 
+                                  onClick={() => { setActiveMenuId(null); setStockModalItem(item); }}
+                                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-[#f2f2f2] transition-colors whitespace-nowrap"
+                                >
+                                  Adjust Stock Level
+                                </button>
+                                <div className="my-1 border-t border-gray-100" />
+                                <button 
+                                  onClick={() => { setActiveMenuId(null); handleDelete(item.id, item.name); }}
+                                  className="w-full text-left px-4 py-2.5 text-sm font-medium text-[#961b2b] hover:bg-[#961b2b]/10 transition-colors whitespace-nowrap"
+                                >
+                                  Delete Item
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Attribute Badges */}
+                        <div className="flex flex-wrap items-center gap-1.5 text-xs text-gray-600">
+                          <span className="px-2 py-0.5 rounded-md bg-gray-100 border border-gray-200/50 text-[10px] font-medium text-gray-800">
+                            {item.category}
+                          </span>
+                          {item.condition !== 'N/A' && (
+                            <span className="px-1.5 py-0.5 rounded bg-gray-50 border border-gray-100 text-[10px] text-gray-500">{item.condition}</span>
+                          )}
+                          {item.foilType !== 'N/A' && (
+                            <span className="px-1.5 py-0.5 rounded bg-amber-50 border border-amber-100/50 text-[10px] text-amber-700 font-medium">✨ {item.foilType}</span>
+                          )}
+                          {item.category === 'Slab' && item.certNumber ? (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-50 border border-purple-100/50 text-[10px] text-purple-700 font-mono">
+                              <span className="font-bold tracking-wider">{item.gradingCompany}</span> #{item.certNumber}
+                            </span>
+                          ) : null}
+                        </div>
+
+                        {/* Inventory & Financial Info */}
+                        <div className="grid grid-cols-3 gap-2.5 bg-gray-50 rounded-xl p-3 border border-gray-100 text-xs">
+                          <div>
+                            <span className="text-gray-400 block mb-0.5 uppercase tracking-wider text-[9px] font-semibold">Stock level</span>
+                            <span className={`font-mono font-bold ${item.quantity < 3 ? 'text-[#961b2b]' : 'text-gray-800'}`}>
+                              {item.quantity} units
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-gray-400 block mb-0.5 uppercase tracking-wider text-[9px] font-semibold">Cost Basis</span>
+                            <span className="font-mono text-gray-600 block">{formatIDR(item.costBasis)}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-400 block mb-0.5 uppercase tracking-wider text-[9px] font-semibold">Market price</span>
+                            <span className="font-mono font-bold text-emerald-600 block">{formatIDR(item.currentPrice)}</span>
+                          </div>
+                        </div>
+
+                        {/* Cost Batches Sub-list */}
+                        {item.batches && item.batches.length > 0 && (
+                          <div className="pt-2">
+                            <button 
+                              onClick={(e) => toggleRow(item.id, e)}
+                              className="text-xs text-[#961b2b] font-medium flex items-center gap-1 hover:underline"
+                            >
+                              {expandedRowIds.includes(item.id) ? 'Collapse Cost Batches' : `View ${item.batches.length} Cost Batches`}
+                              {expandedRowIds.includes(item.id) ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                            </button>
+                            
+                            {expandedRowIds.includes(item.id) && (
+                              <div className="mt-2 pl-3 border-l-2 border-[#961b2b] space-y-1.5 py-1">
+                                {item.batches.map(batch => (
+                                  <div key={batch.batchId} className="flex justify-between text-[11px] bg-gray-50 border border-gray-100 p-2 rounded-lg font-mono">
+                                    <div>
+                                      <div className="text-gray-400 text-[9px] uppercase font-bold">Batch ID: {batch.batchId}</div>
+                                      <div className="text-gray-600 mt-0.5">{batch.date}</div>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="text-gray-800 font-bold">{batch.qty} Units</div>
+                                      <div className="text-gray-500 mt-0.5">{formatIDR(batch.costBasis)}</div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
                 </React.Fragment>
               ))}
             </tbody>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Search, Plus, X, ShoppingCart, Trash2, ArrowRight, Camera, Info } from 'lucide-react';
 import { formatIDR } from '../utils/currency';
 import { CurrencyInput } from './CurrencyInput';
@@ -10,6 +10,7 @@ interface NewSaleDrawerProps {
   inventory: any[];
   onAddTransaction: (t: any) => void;
   onUpdateInventory: (items: {id: string, quantityToDeduct: number}[]) => void;
+  initialSellItemCode?: string;
 }
 
 export function NewSaleDrawer({
@@ -17,11 +18,22 @@ export function NewSaleDrawer({
   onClose,
   inventory,
   onAddTransaction,
-  onUpdateInventory
+  onUpdateInventory,
+  initialSellItemCode
 }: NewSaleDrawerProps) {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isProcessingScan, setIsProcessingScan] = useState(false);
+  const scanLockRef = useRef(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [cart, setCart] = useState<{ id: string; name: string; price: number; cost: number; quantity: number, maxQuantity: number, category: string }[]>([]);
+  const [cart, setCart] = useState<{ id: string; name: string; price: number; cost: number; quantity: number, maxQuantity: number, category: string }[]>(() => {
+    if (initialSellItemCode) {
+      const item = inventory.find(i => i.id === initialSellItemCode);
+      if (item && item.quantity > 0) {
+        return [{ id: item.id, name: item.name, price: item.currentPrice || 0, cost: item.costBasis, quantity: 1, maxQuantity: item.quantity, category: item.category }];
+      }
+    }
+    return [];
+  });
   const [salesChannel, setSalesChannel] = useState('In-Store POS');
   const [platformFee, setPlatformFee] = useState(0);
   const [shippingCost, setShippingCost] = useState(0);
@@ -30,18 +42,29 @@ export function NewSaleDrawer({
   if (!isOpen) return null;
 
   const handleScan = (decodedText: string) => {
-    // Attempt exact match on ID, batchId, name or cardNumber
-    const foundItem = inventory.find(i => 
-      i.id === decodedText || 
-      i.batches?.some((b: any) => b.batchId === decodedText) ||
-      (i.cardNumber && i.cardNumber.toLowerCase() === decodedText.toLowerCase()) ||
-      i.name.toLowerCase() === decodedText.toLowerCase()
-    );
+    if (scanLockRef.current) return;
+    scanLockRef.current = true;
+    setIsProcessingScan(true);
+
+    const sanitizedScan = decodedText.trim().toUpperCase();
+
+    // Direct, strict lookup against the sanitized scanned string
+    const foundItem = inventory.find(i => {
+      const itemIdSanitized = i.id ? i.id.trim().toUpperCase() : '';
+      const itemCardNumberSanitized = i.cardNumber ? i.cardNumber.trim().toUpperCase() : '';
+      const itemNameSanitized = i.name ? i.name.trim().toUpperCase() : '';
+      
+      const matchesBatch = i.batches?.some((b: any) => b.batchId && b.batchId.trim().toUpperCase() === sanitizedScan);
+
+      return itemIdSanitized === sanitizedScan || 
+             itemCardNumberSanitized === sanitizedScan ||
+             itemNameSanitized === sanitizedScan ||
+             matchesBatch;
+    });
     
     if (foundItem) {
       if (foundItem.quantity > 0) {
         addToCart(foundItem);
-        // Do not close scanner if it's set to continuous, handled in BarcodeScanner
       } else {
         setErrorMsg(`Item ${foundItem.name} is out of stock.`);
       }
@@ -49,6 +72,12 @@ export function NewSaleDrawer({
       setSearchQuery(decodedText);
       setIsScannerOpen(false); // Close on unknown scan to let user search manually
     }
+
+    // Cooldown lock for 600ms
+    setTimeout(() => {
+      scanLockRef.current = false;
+      setIsProcessingScan(false);
+    }, 600);
   };
 
   const filteredInventory = searchQuery 

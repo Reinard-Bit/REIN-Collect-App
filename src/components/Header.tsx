@@ -12,26 +12,28 @@ export function Header({ onOpenScanner, onMenuClick }: { onOpenScanner?: () => v
             <Menu size={20} />
           </button>
         )}
-        <div className="relative flex-1">
+        <div className="relative flex-1 flex items-center">
           <Search
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none"
             size={18}
           />
           <input
             type="text"
             placeholder="Search inventory, transactions, or sets..."
-            className="w-full bg-white border border-gray-200 rounded-lg pl-10 pr-4 py-2 text-sm text-gray-800 placeholder-gray-500 focus:outline-none focus:border-[#961b2b]/50 focus:ring-1 focus:ring-[#961b2b]/50 transition-all"
+            className="w-full bg-white border border-gray-200 rounded-lg pl-10 pr-12 py-2 text-sm text-gray-800 placeholder-gray-500 focus:outline-none focus:border-[#961b2b]/50 focus:ring-1 focus:ring-[#961b2b]/50 transition-all h-[38px]"
           />
+          {onOpenScanner && (
+            <button
+              type="button"
+              onClick={onOpenScanner}
+              className="absolute right-1 w-11 h-11 flex items-center justify-center cursor-pointer text-[#961b2b] hover:text-[#961b2b]/80 transition-colors focus:outline-none"
+              title="Scan QR / Barcode"
+              aria-label="Scan QR / Barcode with Camera"
+            >
+              <Camera size={20} />
+            </button>
+          )}
         </div>
-        {onOpenScanner && (
-          <button 
-            onClick={onOpenScanner}
-            className="flex items-center justify-center p-2 bg-[#961b2b] text-white rounded-lg hover:bg-[#961b2b]/90 transition-colors shadow-sm"
-            title="Scan QR / Barcode"
-          >
-            <Camera size={18} />
-          </button>
-        )}
       </div>
 
       <div className="flex items-center gap-4">

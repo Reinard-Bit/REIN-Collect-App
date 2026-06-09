@@ -10,6 +10,7 @@ import {
   ArrowDownRight,
   BrainCircuit,
   CheckCircle2,
+  X,
 } from 'lucide-react';
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
 
@@ -21,13 +22,26 @@ interface DashboardProps {
   outOfPocketCapital: number;
   cashReserve: number;
   onInjectCapital: (amount: number) => void;
+  capitalInjections?: any[];
+  procurementRecords?: any[];
 }
 
-export function Dashboard({ inventory, transactions, onAddTransaction, onUpdateInventory, outOfPocketCapital, cashReserve, onInjectCapital }: DashboardProps) {
+export function Dashboard({ 
+  inventory, 
+  transactions, 
+  onAddTransaction, 
+  onUpdateInventory, 
+  outOfPocketCapital, 
+  cashReserve, 
+  onInjectCapital,
+  capitalInjections = [],
+  procurementRecords = []
+}: DashboardProps) {
   const [isNewSaleOpen, setIsNewSaleOpen] = useState(false);
   const [successMsg, setSuccessMsg] = useState(false);
   const [isInjectModalOpen, setIsInjectModalOpen] = useState(false);
   const [injectAmount, setInjectAmount] = useState('');
+  const [activeLedgerModal, setActiveLedgerModal] = useState<'total' | 'cash' | 'active' | null>(null);
 
   const handleAddAndShowSuccess = (t: any) => {
     onAddTransaction(t);
@@ -51,11 +65,84 @@ export function Dashboard({ inventory, transactions, onAddTransaction, onUpdateI
   const smartFlipValue = cashReserve > outOfPocketCapital ? cashReserve - outOfPocketCapital : outOfPocketCapital - cashReserve;
   const isSurplus = cashReserve > outOfPocketCapital;
 
+  // Chronological cash reserve movements helper
+  const sortedCashMovements = (() => {
+    const movements: any[] = [];
+
+    // 1. Capital Injections
+    capitalInjections.forEach(inj => {
+      movements.push({
+        id: inj.id,
+        date: inj.date,
+        type: 'injection',
+        description: inj.id === 'INJ-INITIAL' ? 'Initial Capital Investment' : 'Capital Injection',
+        amount: inj.amount,
+        impact: 'inflow'
+      });
+    });
+
+    // 2. Sales Transactions
+    transactions.forEach(trx => {
+      const netRevenue = trx.total - (trx.platform_fee || 0) - (trx.shipping_cost || 0);
+      const firstItem = trx.items && trx.items[0];
+      const itemName = firstItem ? firstItem.name : 'Custom POS/Manual Sale';
+      const count = trx.items ? trx.items.length : 0;
+      const addition = count > 1 ? ` + ${count - 1} items` : '';
+      
+      movements.push({
+        id: trx.id,
+        date: trx.date,
+        type: 'sale',
+        description: `POS Sale: ${itemName}${addition}`,
+        amount: netRevenue,
+        impact: 'inflow'
+      });
+    });
+
+    // 3. Procurement Records
+    procurementRecords.forEach(proc => {
+      movements.push({
+        id: proc.id,
+        date: proc.date,
+        type: 'procurement',
+        description: `Procurement: ${proc.itemName}`,
+        amount: proc.totalCost,
+        impact: 'outflow'
+      });
+    });
+
+    const parseDateStr = (dateStr: string) => {
+      try {
+        const parts = dateStr.split(' ');
+        if (parts.length === 3) {
+          const months: { [key: string]: number } = {
+            jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+            jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
+          };
+          const day = parseInt(parts[0], 10);
+          const month = months[parts[1].toLowerCase().substring(0, 3)] || 0;
+          const year = parseInt(parts[2], 10);
+          return new Date(year, month, day).getTime();
+        }
+        return Date.parse(dateStr) || 0;
+      } catch {
+        return 0;
+      }
+    };
+
+    return movements.sort((a, b) => {
+      const timeA = parseDateStr(a.date);
+      const timeB = parseDateStr(b.date);
+      if (timeB !== timeA) return timeB - timeA;
+      return b.id.localeCompare(a.id);
+    });
+  })();
+
   // Group transactions for the chart
   const last30Days = new Date();
   last30Days.setDate(last30Days.getDate() - 30);
   
-  const chartPoints = Object.entries(
+  const chartPoints: any[] = Object.entries(
     transactions.reduce((acc, trx) => {
       // In a real app we'd parse the actual date, this is simplified
       const idStr = trx.id.split('-')[1];
@@ -67,11 +154,32 @@ export function Dashboard({ inventory, transactions, onAddTransaction, onUpdateI
     }, {} as Record<string, any>)
   ).map(([, val]) => val);
   
-  // if no points, at least show a flatline
-  const chartData = chartPoints.length ? chartPoints : [
-    { name: 'Prev', revenue: 0, cost: 0 },
-    { name: 'Now', revenue: 0, cost: 0 }
-  ];
+  // Intercept and pad single data point to resolve Recharts dual-point requirement for line rendering
+  let chartData = [...chartPoints];
+  if (chartData.length === 1) {
+    const singlePoint = chartData[0];
+    let prevDateStr = 'Prev';
+    try {
+      const dNow = new Date();
+      dNow.setDate(dNow.getDate() - 1);
+      prevDateStr = dNow.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+      if (prevDateStr === singlePoint.name) {
+        dNow.setDate(dNow.getDate() - 1);
+        prevDateStr = dNow.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+      }
+    } catch {
+      prevDateStr = 'Prev';
+    }
+    chartData.unshift({ name: prevDateStr, revenue: 0, cost: 0 });
+  } else if (chartData.length === 0) {
+    const dNow = new Date();
+    const dPrev = new Date();
+    dPrev.setDate(dPrev.getDate() - 1);
+    chartData = [
+      { name: dPrev.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }), revenue: 0, cost: 0 },
+      { name: dNow.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }), revenue: 0, cost: 0 }
+    ];
+  }
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto relative">
@@ -82,20 +190,20 @@ export function Dashboard({ inventory, transactions, onAddTransaction, onUpdateI
         </div>
       )}
 
-      <div className="flex items-center justify-between mt-4">
-        <h2 className="text-2xl font-bold tracking-tight text-gray-900">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-4">
+        <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900">
           Financial Overview
         </h2>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-2 sm:gap-3">
           <button 
             onClick={() => setIsInjectModalOpen(true)}
-            className="px-4 py-2 text-sm font-medium bg-white border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors shadow-sm"
+            className="px-4 py-2 text-sm font-medium bg-white border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors shadow-sm min-h-[44px]"
           >
             Inject Capital
           </button>
           <button 
             onClick={() => setIsNewSaleOpen(true)}
-            className="px-6 py-3 text-base font-bold bg-[#961b2b] text-gray-100 rounded-xl hover:bg-[#961b2b]/95 shadow-[0_4px_12px_rgba(150,27,43,0.3)] hover:shadow-[0_6px_16px_rgba(150,27,43,0.4)] transition-all flex items-center gap-2"
+            className="px-4 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base font-bold bg-[#961b2b] text-gray-100 rounded-xl hover:bg-[#961b2b]/95 shadow-[0_4px_12px_rgba(150,27,43,0.3)] hover:shadow-[0_6px_16px_rgba(150,27,43,0.4)] transition-all flex items-center justify-center gap-2 min-h-[44px]"
           >
             New Transaction
           </button>
@@ -109,6 +217,7 @@ export function Dashboard({ inventory, transactions, onAddTransaction, onUpdateI
           trend="Base Investment"
           isPositive={null}
           icon={<DollarSign className="text-gray-500" size={20} />}
+          onClick={() => setActiveLedgerModal('total')}
         />
         <MetricCard
           title="Cash Reserve (Wallet)"
@@ -116,6 +225,7 @@ export function Dashboard({ inventory, transactions, onAddTransaction, onUpdateI
           trend={cashReserve >= outOfPocketCapital ? 'Profitable' : 'Deficit'}
           isPositive={cashReserve >= outOfPocketCapital}
           icon={<TrendingUp className="text-[#961b2b]" size={20} />}
+          onClick={() => setActiveLedgerModal('cash')}
         />
         <MetricCard
           title={smartFlipLabel}
@@ -125,12 +235,13 @@ export function Dashboard({ inventory, transactions, onAddTransaction, onUpdateI
           icon={<PackageOpen className={isSurplus ? "text-emerald-600" : "text-[#961b2b]"} size={20} />}
           highlight={isSurplus}
           valueColor={isSurplus ? "text-[#2e7d32]" : "text-gray-900"}
+          onClick={() => setActiveLedgerModal('active')}
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white border border-gray-200 rounded-[12px] shadow-[0_4px_12px_rgba(0,0,0,0.04)] p-6">
+          <div className="bg-white border border-gray-200 rounded-[12px] shadow-[0_4px_12px_rgba(0,0,0,0.04)] p-4 sm:p-6">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900">
                 Revenue vs Cost of Goods Sold
@@ -141,12 +252,16 @@ export function Dashboard({ inventory, transactions, onAddTransaction, onUpdateI
                 <option>Year to Date</option>
               </select>
             </div>
-            <div className="h-72">
+            <div className="h-72 min-h-[300px] w-full" style={{ minHeight: '300px' }}>
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData}>
                   <defs>
                     <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#961b2b" stopOpacity={0.3} />
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#961b2b" stopOpacity={0.2} />
                       <stop offset="95%" stopColor="#961b2b" stopOpacity={0} />
                     </linearGradient>
                   </defs>
@@ -170,25 +285,29 @@ export function Dashboard({ inventory, transactions, onAddTransaction, onUpdateI
                   <Area
                     type="monotone"
                     dataKey="revenue"
-                    stroke="#961b2b"
-                    strokeWidth={2}
+                    stroke="#10b981"
+                    strokeWidth={2.5}
                     fillOpacity={1}
                     fill="url(#colorRevenue)"
+                    dot={{ r: 3, strokeWidth: 1.5, fill: '#10b981' }}
+                    activeDot={{ r: 6, strokeWidth: 0, fill: '#10b981' }}
                   />
                   <Area
                     type="monotone"
                     dataKey="cost"
-                    stroke="#52525b"
-                    strokeWidth={2}
-                    fillOpacity={0.1}
-                    fill="#52525b"
+                    stroke="#961b2b"
+                    strokeWidth={2.5}
+                    fillOpacity={1}
+                    fill="url(#colorCost)"
+                    dot={{ r: 3, strokeWidth: 1.5, fill: '#961b2b' }}
+                    activeDot={{ r: 6, strokeWidth: 0, fill: '#961b2b' }}
                   />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-[12px] shadow-[0_4px_12px_rgba(0,0,0,0.04)] p-6">
+          <div className="bg-white border border-gray-200 rounded-[12px] shadow-[0_4px_12px_rgba(0,0,0,0.04)] p-4 sm:p-6">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900">
                 Recent High-Value Transactions
@@ -202,7 +321,7 @@ export function Dashboard({ inventory, transactions, onAddTransaction, onUpdateI
         </div>
 
         <div className="space-y-6">
-          <div className="bg-white border border-gray-200 rounded-[12px] shadow-[0_4px_12px_rgba(0,0,0,0.04)] p-6">
+          <div className="bg-white border border-gray-200 rounded-[12px] shadow-[0_4px_12px_rgba(0,0,0,0.04)] p-4 sm:p-6">
             <div className="flex items-center gap-2 mb-6">
               <BrainCircuit className="text-[#961b2b]" size={20} />
               <h3 className="text-lg font-semibold text-gray-900">
@@ -268,6 +387,298 @@ export function Dashboard({ inventory, transactions, onAddTransaction, onUpdateI
           </div>
         </div>
       )}
+
+      {/* --- Ledger Modals --- */}
+      {/* 1. Total Capital Ledger Modal */}
+      {activeLedgerModal === 'total' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity"
+            onClick={() => setActiveLedgerModal(null)}
+          />
+          <div className="relative bg-white border border-gray-200 rounded-[16px] shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="p-5 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Total Out-of-Pocket Capital Ledger</h3>
+                <p className="text-xs text-gray-500 mt-1">History of manual capital seed injections that establish your base investment.</p>
+              </div>
+              <button 
+                onClick={() => setActiveLedgerModal(null)}
+                className="p-1.5 hover:bg-gray-250 rounded-lg text-gray-500 hover:text-gray-800 transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-6 flex-1">
+              {/* Summary stats */}
+              <div className="bg-[#961b2b]/5 border border-[#961b2b]/15 rounded-xl p-4 flex justify-between items-center font-mono">
+                <div>
+                  <span className="text-[11px] text-gray-500 uppercase tracking-wider block font-semibold">Total Base Investment</span>
+                  <span className="text-2xl font-extrabold text-[#961b2b]">{formatIDR(outOfPocketCapital)}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[11px] text-gray-500 uppercase tracking-wider block font-semibold">Injections Logs</span>
+                  <span className="text-base font-bold text-gray-700">{capitalInjections.length} Entries</span>
+                </div>
+              </div>
+
+              {/* Ledger list */}
+              <div className="border border-gray-200 rounded-xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs whitespace-nowrap">
+                    <thead className="bg-gray-50 text-gray-500 border-b border-gray-200">
+                      <tr>
+                        <th className="px-5 py-3 font-semibold text-[10px] uppercase tracking-wider">Date of Injection</th>
+                        <th className="px-5 py-3 font-semibold text-[10px] uppercase tracking-wider">Movement Type</th>
+                        <th className="px-5 py-3 font-semibold text-[10px] uppercase tracking-wider">Reference ID</th>
+                        <th className="px-5 py-3 font-semibold text-[10px] uppercase tracking-wider text-right">Injected Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 font-mono text-gray-705">
+                      {capitalInjections.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="px-5 py-8 text-center text-gray-500 font-sans">
+                            No manual capital injections recorded yet. Use "Inject Capital" to fund operations.
+                          </td>
+                        </tr>
+                      ) : (
+                        capitalInjections.map((inj) => (
+                          <tr key={inj.id} className="hover:bg-gray-50/50 transition-colors">
+                            <td className="px-5 py-3 text-gray-600 font-sans">{inj.date}</td>
+                            <td className="px-5 py-3 font-sans">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 border border-emerald-500/25 text-emerald-600">
+                                Capital In
+                              </span>
+                            </td>
+                            <td className="px-5 py-3 text-gray-400 text-[11px]">{inj.id}</td>
+                            <td className="px-5 py-3 text-right text-emerald-600 font-bold">{formatIDR(inj.amount)}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-gray-50 border-t border-gray-200 flex justify-end">
+              <button
+                onClick={() => setActiveLedgerModal(null)}
+                className="px-6 py-2 text-xs font-bold bg-[#961b2b] text-gray-100 rounded-lg hover:bg-[#961b2b]/95 shadow transition-all duration-150 min-h-[40px]"
+              >
+                Close Ledger
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Cash Reserve Ledger Modal */}
+      {activeLedgerModal === 'cash' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity"
+            onClick={() => setActiveLedgerModal(null)}
+          />
+          <div className="relative bg-white border border-gray-200 rounded-[16px] shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="p-5 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Cash Reserve (Wallet) Ledger</h3>
+                <p className="text-xs text-gray-500 mt-1">Real-time breakdown of fluid cash reserve (Injections + Sales Revenue - Procurements).</p>
+              </div>
+              <button 
+                onClick={() => setActiveLedgerModal(null)}
+                className="p-1.5 hover:bg-gray-250 rounded-lg text-gray-500 hover:text-gray-800 transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-6 flex-1">
+              {/* Summary stats */}
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 flex justify-between items-center font-mono">
+                <div>
+                  <span className="text-[11px] text-gray-500 uppercase tracking-wider block font-semibold">Active Liquid Wallet Balance</span>
+                  <span className={`text-2xl font-extrabold ${cashReserve >= 0 ? 'text-[#961b2b]' : 'text-red-600'}`}>
+                    {formatIDR(cashReserve)}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[11px] text-gray-500 uppercase tracking-wider block font-semibold">Journal Entries</span>
+                  <span className="text-base font-bold text-gray-700">{sortedCashMovements.length} Records</span>
+                </div>
+              </div>
+
+              {/* Ledger list */}
+              <div className="border border-gray-200 rounded-xl overflow-hidden animate-in fade-in duration-300">
+                <div className="overflow-x-auto max-h-[45vh]">
+                  <table className="w-full text-left text-xs whitespace-nowrap">
+                    <thead className="bg-gray-50 text-gray-500 border-b border-gray-200 sticky top-0 z-10">
+                      <tr>
+                        <th className="px-5 py-3 font-semibold text-[10px] uppercase tracking-wider">Date</th>
+                        <th className="px-5 py-3 font-semibold text-[10px] uppercase tracking-wider">Flow</th>
+                        <th className="px-5 py-3 font-semibold text-[10px] uppercase tracking-wider">Source description</th>
+                        <th className="px-5 py-3 font-semibold text-[10px] uppercase tracking-wider text-right">Cash Impact</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 font-mono text-gray-705">
+                      {sortedCashMovements.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="px-5 py-8 text-center text-gray-500 font-sans">
+                            No cash reserve movements registered in the wallet ledger yet.
+                          </td>
+                        </tr>
+                      ) : (
+                        sortedCashMovements.map((move, hIdx) => (
+                          <tr key={`${move.id}-${hIdx}`} className="hover:bg-gray-50/50 transition-colors">
+                            <td className="px-5 py-3 text-gray-500 text-[11px] font-sans whitespace-nowrap">{move.date}</td>
+                            <td className="px-5 py-3 font-sans whitespace-nowrap">
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
+                                move.impact === 'inflow' 
+                                  ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-600'
+                                  : 'bg-red-500/10 border border-red-500/20 text-red-600'
+                              }`}>
+                                {move.impact === 'inflow' ? 'Cash In' : 'Cash Out'}
+                              </span>
+                            </td>
+                            <td className="px-5 py-3 text-gray-800 break-words font-sans font-medium min-w-[200px]">
+                              <div className="line-clamp-1 leading-snug whitespace-normal">{move.description}</div>
+                              <div className="text-[10px] text-gray-400 mt-0.5 font-mono">{move.id}</div>
+                            </td>
+                            <td className={`px-5 py-3 text-right font-bold whitespace-nowrap ${
+                              move.impact === 'inflow' ? 'text-emerald-500' : 'text-red-500'
+                            }`}>
+                              {move.impact === 'inflow' ? '+' : '-'}{formatIDR(move.amount).replace('Rp', '').trim()}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-gray-50 border-t border-gray-200 flex justify-end">
+              <button
+                onClick={() => setActiveLedgerModal(null)}
+                className="px-6 py-2 text-xs font-bold bg-[#961b2b] text-gray-100 rounded-lg hover:bg-[#961b2b]/95 shadow transition-all duration-150 min-h-[40px]"
+              >
+                Close Ledger
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. Active Capital Ledger Modal */}
+      {activeLedgerModal === 'active' && (() => {
+        const unsoldItems = inventory.filter(item => item.quantity > 0);
+        const totalActiveCost = unsoldItems.reduce((sum, item) => sum + (item.costBasis * item.quantity), 0);
+        
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div 
+              className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity"
+              onClick={() => setActiveLedgerModal(null)}
+            />
+            <div className="relative bg-white border border-gray-200 rounded-[16px] shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+              {/* Header */}
+              <div className="p-5 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Active Capital ("At Risk") Ledger</h3>
+                  <p className="text-xs text-gray-500 mt-1">Live tracking of capital actively tied up inside physical unsold inventory stock.</p>
+                </div>
+                <button 
+                  onClick={() => setActiveLedgerModal(null)}
+                  className="p-1.5 hover:bg-gray-250 rounded-lg text-gray-500 hover:text-gray-800 transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              
+              {/* Modal Body */}
+              <div className="p-6 overflow-y-auto space-y-6 flex-1">
+                {/* Summary stats */}
+                <div className="bg-[#961b2b]/5 border border-[#961b2b]/15 rounded-xl p-4 flex justify-between items-center font-mono">
+                  <div>
+                    <span className="text-[11px] text-gray-500 uppercase tracking-wider block font-semibold">Total Stock Cost Basis Exposure</span>
+                    <span className="text-2xl font-extrabold text-[#961b2b]">{formatIDR(totalActiveCost)}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[11px] text-gray-500 uppercase tracking-wider block font-semibold">In-Stock Products</span>
+                    <span className="text-base font-bold text-gray-700">{unsoldItems.length} Unique Cards</span>
+                  </div>
+                </div>
+
+                {/* Ledger list */}
+                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                  <div className="overflow-x-auto max-h-[45vh]">
+                    <table className="w-full text-left text-xs whitespace-nowrap">
+                      <thead className="bg-gray-50 text-gray-500 border-b border-gray-200 sticky top-0 z-10">
+                        <tr>
+                          <th className="px-5 py-3 font-semibold text-[10px] uppercase tracking-wider">Unsold Item Name</th>
+                          <th className="px-5 py-3 font-semibold text-[10px] uppercase tracking-wider">Classification</th>
+                          <th className="px-5 py-3 font-semibold text-[10px] uppercase tracking-wider text-center">In Stock</th>
+                          <th className="px-5 py-3 font-semibold text-[10px] uppercase tracking-wider text-right">Unit basis</th>
+                          <th className="px-5 py-3 font-semibold text-[10px] uppercase tracking-wider text-right">Subtotal cost</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 font-mono text-gray-705 text-[11px]">
+                        {unsoldItems.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="px-5 py-8 text-center text-gray-500 font-sans">
+                              Your physical inventory is currently completely sold out! No sleeping active capital.
+                            </td>
+                          </tr>
+                        ) : (
+                          unsoldItems.map((item, idx) => (
+                            <tr key={`${item.id}-${idx}`} className="hover:bg-gray-50/50 transition-colors">
+                              <td className="px-5 py-3 text-gray-800 font-sans min-w-[150px]">
+                                <div className="font-bold leading-tight text-sm line-clamp-1 break-words whitespace-normal">{item.name}</div>
+                                <div className="text-[10px] text-gray-400 mt-0.5 font-medium">{item.set} {item.cardNumber ? `#${item.cardNumber}` : ''}</div>
+                              </td>
+                              <td className="px-5 py-3 font-sans whitespace-nowrap">
+                                <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
+                                  item.category === 'Raw Card'
+                                    ? 'bg-blue-500/10 border border-blue-500/10 text-blue-600'
+                                    : 'bg-purple-500/10 border border-purple-500/10 text-purple-600'
+                                }`}>
+                                  {item.category} • {item.condition}
+                                </span>
+                              </td>
+                              <td className="px-5 py-3 text-center text-gray-900 font-bold text-sm">{item.quantity}</td>
+                              <td className="px-5 py-3 text-right text-gray-500">{formatIDR(item.costBasis)}</td>
+                              <td className="px-5 py-3 text-right font-bold text-gray-800">{formatIDR(item.costBasis * item.quantity)}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 bg-gray-50 border-t border-gray-200 flex justify-end">
+                <button
+                  onClick={() => setActiveLedgerModal(null)}
+                  className="px-6 py-2 text-xs font-bold bg-[#961b2b] text-gray-100 rounded-lg hover:bg-[#961b2b]/95 shadow transition-all duration-150 min-h-[40px]"
+                >
+                  Close Ledger
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -280,6 +691,7 @@ function MetricCard({
   icon,
   highlight = false,
   valueColor = 'text-gray-900',
+  onClick,
 }: {
   title: string;
   value: string;
@@ -288,12 +700,18 @@ function MetricCard({
   icon: React.ReactNode;
   highlight?: boolean;
   valueColor?: string;
+  onClick?: () => void;
 }) {
   return (
     <div
-      className={`p-6 rounded-[12px] border ${
+      onClick={onClick}
+      className={`p-6 rounded-[12px] border transition-all duration-200 ${
+        onClick 
+          ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.98] hover:border-[#961b2b]/40' 
+          : ''
+      } ${
         highlight
-          ? 'bg-gradient-to-br from-white to-gray-50 border-[#961b2b]/30 shadow-[0_4px_12px_rgba(0,0,0,0.04)]'
+          ? 'bg-gradient-to-br from-white to-gray-50 border-gray-200 shadow-[0_4px_12px_rgba(0,0,0,0.04)]'
           : 'bg-white border-gray-200 shadow-[0_4px_12px_rgba(0,0,0,0.04)]'
       }`}
     >
@@ -397,7 +815,7 @@ function InventoryTable({ transactions, inventory }: { transactions: any[], inve
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
         <thead>
-          <tr className="text-gray-500 border-b border-gray-200">
+          <tr className="hidden md:table-row text-gray-500 border-b border-gray-200">
             <th className="pb-3 font-medium">Item</th>
             <th className="pb-3 font-medium">Channel</th>
             <th className="pb-3 font-medium">Type</th>
@@ -405,7 +823,7 @@ function InventoryTable({ transactions, inventory }: { transactions: any[], inve
             <th className="pb-3 font-medium text-right">Status</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-100">
+        <tbody className="divide-y divide-gray-100 md:table-row-group block w-full">
           {recentTransactions.length === 0 ? (
             <tr>
               <td colSpan={5} className="py-8 text-center text-gray-500">
@@ -422,35 +840,98 @@ function InventoryTable({ transactions, inventory }: { transactions: any[], inve
               const isProfit = (trx.total - trx.cost - trx.platform_fee - trx.shipping_cost) > 0;
 
               return (
-                <tr key={trx.id} className="group hover:bg-gray-50 transition-colors">
-                  <td className="py-4">
-                    <div className="font-medium text-gray-800">{itemName}{addition}</div>
-                    <div className="text-xs text-gray-500 font-mono mt-0.5">{trx.id}</div>
-                  </td>
-                  <td className="py-4">
-                    <span className={`px-2.5 py-1 rounded-full border text-xs font-semibold ${getChannelBadge(trx.channel)}`}>
-                      {trx.channel}
-                    </span>
-                  </td>
-                  <td className="py-4 text-gray-500">{firstItem ? firstItem.category : 'N/A'}</td>
-                  <td className={`py-4 text-right font-mono ${isProfit ? 'text-emerald-500' : 'text-[#961b2b]'}`}>
-                    {formatIDR(trx.total)}
-                  </td>
-                  <td className="py-4 text-right">
-                    <span
-                      className={`inline-flex items-center gap-1.5 text-xs font-medium ${
-                        trx.status === 'Completed' ? 'text-emerald-500' : 'text-gray-500'
-                      }`}
-                    >
+                <React.Fragment key={trx.id}>
+                  {/* Desktop view */}
+                  <tr className="hidden md:table-row group hover:bg-gray-50 transition-colors">
+                    <td className="py-4">
+                      <div className="font-medium text-gray-800">{itemName}{addition}</div>
+                      <div className="text-xs text-gray-500 font-mono mt-0.5">{trx.id}</div>
+                    </td>
+                    <td className="py-4">
+                      <span className={`px-2.5 py-1 rounded-full border text-xs font-semibold ${getChannelBadge(trx.channel)}`}>
+                        {trx.channel}
+                      </span>
+                    </td>
+                    <td className="py-4 text-gray-500">{firstItem ? firstItem.category : 'N/A'}</td>
+                    <td className={`py-4 text-right font-mono ${isProfit ? 'text-emerald-500' : 'text-[#961b2b]'}`}>
+                      {formatIDR(trx.total)}
+                    </td>
+                    <td className="py-4 text-right">
                       <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          trx.status === 'Completed' ? 'bg-emerald-500' : 'bg-gray-400'
+                        className={`inline-flex items-center gap-1.5 text-xs font-medium ${
+                          trx.status === 'Completed' ? 'text-emerald-500' : 'text-gray-500'
                         }`}
-                      />
-                      {trx.status}
-                    </span>
-                  </td>
-                </tr>
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            trx.status === 'Completed' ? 'bg-emerald-500' : 'bg-gray-400'
+                          }`}
+                        />
+                        {trx.status}
+                      </span>
+                    </td>
+                  </tr>
+
+                  {/* Mobile view (Card Stack) */}
+                  <tr className="md:hidden block w-full border-b border-gray-100 last:border-0">
+                    <td className="block p-0 border-none bg-transparent w-full">
+                      <div className="flex flex-col gap-2.5 py-3.5 bg-white rounded-lg">
+                        <div className="flex justify-between items-start gap-2">
+                          <div className="space-y-0.5">
+                            <div className="font-semibold text-gray-800 text-sm leading-tight break-words whitespace-normal">{itemName}{addition}</div>
+                            <div className="text-[11px] text-gray-400 mt-0.5 flex flex-wrap items-center gap-1.5 font-medium">
+                              <span className="font-mono">{trx.id}</span>
+                              <span className="text-gray-300 font-sans">•</span>
+                              <span className="text-gray-500 font-sans">{trx.date}</span>
+                            </div>
+                          </div>
+                          <div className={`text-sm font-bold font-mono whitespace-nowrap mt-0.5 ${isProfit ? 'text-emerald-500' : 'text-[#961b2b]'}`}>
+                            {formatIDR(trx.total)}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-50">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={`px-2 py-0.5 rounded-full border text-[11px] font-semibold ${getChannelBadge(trx.channel)}`}>
+                              {trx.channel}
+                            </span>
+                            <span className="text-[11px] text-gray-500 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100">
+                              {firstItem ? firstItem.category : 'N/A'}
+                            </span>
+                          </div>
+                          <div>
+                            <span
+                              className={`inline-flex items-center gap-1 text-[11px] font-medium ${
+                                trx.status === 'Completed' ? 'text-emerald-500' : 'text-gray-500'
+                              }`}
+                            >
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  trx.status === 'Completed' ? 'bg-emerald-500' : 'bg-gray-400'
+                                }`}
+                              />
+                              {trx.status}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Financial Breakdown */}
+                        <div className="mt-2 text-[11px] p-2 bg-[#f2f2f2]/60 rounded-lg border border-gray-100 flex items-center justify-between text-xs gap-3">
+                          <div className="flex items-center gap-1">
+                            <span className="text-gray-500 font-medium">Base Cost:</span>
+                            <span className="font-mono text-gray-700 font-medium">{formatIDR(trx.cost || 0)}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span className="text-gray-500 font-medium">Profit margin:</span>
+                            <span className={`font-mono font-bold ${(trx.total - (trx.cost || 0)) >= 0 ? 'text-[#2e7d32]' : 'text-[#961b2b]'}`}>
+                              {formatIDR(trx.total - (trx.cost || 0))}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                </React.Fragment>
               );
             })
           )}

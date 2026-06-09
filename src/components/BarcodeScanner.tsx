@@ -89,10 +89,12 @@ export function BarcodeScanner({ isOpen, onClose, onScan, continuous = false }: 
       };
 
       await html5QrCode.start(
-        { facingMode: facingMode },
+        { facingMode: "environment" }, // Explicitly set constraints to use the primary rear camera
         config,
         (decodedText) => {
-          onScan(decodedText);
+          // Immediately sanitize the scanned output to avoid whitespace/case-sensitivity issues
+          const sanitizedText = decodedText.trim().toUpperCase();
+          onScan(sanitizedText);
           if (continuous) {
             setScanFlash(true);
             playSuccessSound();

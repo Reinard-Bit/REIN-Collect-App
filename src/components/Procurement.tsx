@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Search, Plus, PackageOpen, DollarSign, Calendar, User, Tag, Layers, Clock, Hash, Image as ImageIcon, Upload, Loader2, Trash2, Check, X, QrCode as QrCodeIcon } from 'lucide-react';
+import { Search, Plus, PackageOpen, DollarSign, Calendar, User, Tag, Layers, Clock, Hash, Image as ImageIcon, Upload, Loader2, Trash2, Check, X, QrCode as QrCodeIcon, Camera } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatIDR } from '../utils/currency';
 import { CurrencyInput } from './CurrencyInput';
@@ -17,17 +17,19 @@ export interface ProcurementRecord {
 }
 
 interface ProcurementProps {
+  key?: string | number;
   masterCatalog: CatalogItem[];
   onAddItem: (item: InventoryItem) => void;
   procurementRecords: ProcurementRecord[];
   onAddProcurements: (records: ProcurementRecord[]) => void;
   onNavigateToHistory: () => void;
   initialSerialNumber?: string | null;
+  onOpenScanner?: () => void;
 }
 
 type ProcurementMode = 'manual' | 'scanner';
 
-export function Procurement({ masterCatalog, onAddItem, procurementRecords, onAddProcurements, onNavigateToHistory, initialSerialNumber }: ProcurementProps) {
+export function Procurement({ masterCatalog, onAddItem, procurementRecords, onAddProcurements, onNavigateToHistory, initialSerialNumber, onOpenScanner }: ProcurementProps) {
   const [mode, setMode] = useState<ProcurementMode>('manual');
   const [showBatchQRModal, setShowBatchQRModal] = useState(false);
   
@@ -38,7 +40,7 @@ export function Procurement({ masterCatalog, onAddItem, procurementRecords, onAd
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-gray-900">
+          <h2 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900">
             Procurement Module
           </h2>
           <p className="text-gray-500 mt-1 text-sm">
@@ -46,44 +48,44 @@ export function Procurement({ masterCatalog, onAddItem, procurementRecords, onAd
           </p>
         </div>
 
-        <div className="flex items-center gap-3 self-start md:self-auto">
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
           <button 
             onClick={() => setShowBatchQRModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium min-h-[44px] flex-1 sm:flex-initial"
           >
             <QrCodeIcon size={16} />
             Bulk Labels
           </button>
           
           {/* Mode Toggle */}
-          <div className="flex p-1 bg-white border border-gray-200 rounded-full w-fit">
-          <button
-            onClick={() => setMode('manual')}
-            className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${
-              mode === 'manual'
-                ? 'bg-white text-black shadow-sm'
-                : 'text-gray-500 hover:text-gray-900'
-            }`}
-          >
-            Manual Entry
-          </button>
-          <button
-            onClick={() => setMode('scanner')}
-            className={`flex items-center gap-2 px-6 py-2 rounded-full text-sm font-medium transition-all ${
-              mode === 'scanner'
-                ? 'bg-[#961b2b] text-gray-900 shadow-[0_0_15px_rgba(220,38,38,0.4)]'
-                : 'text-gray-500 hover:text-gray-900'
-            }`}
-          >
-            <div className={`w-2 h-2 rounded-full ${mode === 'scanner' ? 'bg-white animate-pulse' : 'bg-[#961b2b]'}`} />
-            Bulk AI Scanner
-          </button>
+          <div className="flex p-1 bg-white border border-gray-200 rounded-full w-full sm:w-auto justify-between sm:justify-start">
+            <button
+              onClick={() => setMode('manual')}
+              className={`flex-1 sm:flex-none px-4 sm:px-6 py-2 rounded-full text-sm font-medium transition-all min-h-[38px] ${
+                mode === 'manual'
+                  ? 'bg-white text-black shadow-sm'
+                  : 'text-gray-500 hover:text-gray-900'
+              }`}
+            >
+              Manual Entry
+            </button>
+            <button
+              onClick={() => setMode('scanner')}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 py-2 rounded-full text-sm font-medium transition-all min-h-[38px] ${
+                mode === 'scanner'
+                  ? 'bg-[#961b2b] text-gray-900 shadow-[0_0_15px_rgba(220,38,38,0.4)]'
+                  : 'text-gray-500 hover:text-gray-900'
+              }`}
+            >
+              <div className={`w-2 h-2 rounded-full ${mode === 'scanner' ? 'bg-white animate-pulse' : 'bg-[#961b2b]'}`} />
+              Bulk AI Scanner
+            </button>
           </div>
         </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="bg-white border border-gray-200 rounded-2xl p-8">
+      <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-8">
         {mode === 'manual' ? (
           <ManualEntryForm 
             masterCatalog={masterCatalog}
@@ -98,6 +100,7 @@ export function Procurement({ masterCatalog, onAddItem, procurementRecords, onAd
               setMode('manual'); // Switch back after adding
             }} 
             onAddProcurements={(records) => onAddProcurements(records)}
+            onOpenScanner={onOpenScanner}
           />
         )}
       </div>
@@ -116,9 +119,9 @@ export function Procurement({ masterCatalog, onAddItem, procurementRecords, onAd
         
         <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm whitespace-nowrap">
+            <table className="w-full text-left text-sm block md:table">
               <thead>
-                <tr className="text-gray-500 border-b border-gray-200 bg-[#f2f2f2]/50">
+                <tr className="hidden md:table-row text-gray-500 border-b border-gray-200 bg-[#f2f2f2]/50">
                   <th className="px-6 py-4 font-medium">Date</th>
                   <th className="px-6 py-4 font-medium">Type</th>
                   <th className="px-6 py-4 font-medium">Item / Description</th>
@@ -126,7 +129,7 @@ export function Procurement({ masterCatalog, onAddItem, procurementRecords, onAd
                   <th className="px-6 py-4 font-medium text-right">Total Cost</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5">
+              <tbody className="divide-y divide-white/5 md:table-row-group block w-full">
                 {recentProcurements.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="py-8 text-center text-gray-500">
@@ -135,36 +138,84 @@ export function Procurement({ masterCatalog, onAddItem, procurementRecords, onAd
                   </tr>
                 ) : (
                   recentProcurements.map((proc) => (
-                    <tr key={proc.id} className="group hover:bg-white/[0.02] transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2 text-gray-700">
-                          <Clock size={14} className="text-gray-500" />
-                          {proc.date}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2 py-1 rounded-md border text-xs font-medium whitespace-nowrap ${
-                          proc.type === 'Raw Card' 
-                            ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' 
-                            : proc.type === 'Graded Slab'
-                              ? 'bg-purple-500/10 border-purple-500/20 text-purple-400'
-                              : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                        }`}>
-                          {proc.type}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="font-bold text-gray-900">{proc.itemName}</div>
-                        <div className="text-xs text-gray-500 mt-0.5">{proc.description}</div>
-                      </td>
-                      <td className="px-6 py-4 text-gray-500">
-                        {proc.supplier}
-                      </td>
-                      <td className="px-6 py-4 text-right font-mono text-gray-700">
-                        <span className="text-gray-500/50 mr-1">Rp</span>
-                        {formatIDR(proc.totalCost).replace('Rp', '').trim()}
-                      </td>
-                    </tr>
+                    <React.Fragment key={proc.id}>
+                      {/* Desktop view row */}
+                      <tr className="hidden md:table-row group hover:bg-white/[0.02] transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2 text-gray-700">
+                            <Clock size={14} className="text-gray-500" />
+                            {proc.date}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2 py-1 rounded-md border text-xs font-medium whitespace-nowrap ${
+                            proc.type === 'Raw Card' 
+                              ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' 
+                              : proc.type === 'Graded Slab'
+                                ? 'bg-purple-500/10 border-purple-500/20 text-purple-400'
+                                : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                          }`}>
+                            {proc.type}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="font-bold text-gray-900">{proc.itemName}</div>
+                          <div className="text-xs text-gray-500 mt-0.5">{proc.description}</div>
+                        </td>
+                        <td className="px-6 py-4 text-gray-500">
+                          {proc.supplier}
+                        </td>
+                        <td className="px-6 py-4 text-right font-mono text-gray-700">
+                          <span className="text-gray-500/50 mr-1">Rp</span>
+                          {formatIDR(proc.totalCost).replace('Rp', '').trim()}
+                        </td>
+                      </tr>
+
+                      {/* Mobile Card Stack item */}
+                      <tr className="md:hidden block w-full border-b border-gray-100 last:border-0 hover:bg-gray-50/30 transition-colors">
+                        <td className="block p-4 border-none bg-transparent w-full">
+                          <div className="flex flex-col gap-2.5">
+                            {/* Header */}
+                            <div className="flex justify-between items-start gap-2">
+                              <div className="font-bold text-gray-900 text-sm leading-snug break-words whitespace-normal">
+                                {proc.itemName}
+                              </div>
+                              <span className={`px-2 py-0.5 rounded border text-[10px] font-semibold whitespace-nowrap flex-shrink-0 ${
+                                proc.type === 'Raw Card' 
+                                  ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' 
+                                  : proc.type === 'Graded Slab'
+                                    ? 'bg-purple-500/10 border-purple-500/20 text-purple-400'
+                                    : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                              }`}>
+                                {proc.type}
+                              </span>
+                            </div>
+
+                            {/* Middle description/supplier info */}
+                            <div className="space-y-1">
+                              <div className="text-xs text-gray-500 leading-normal whitespace-normal">
+                                {proc.description}
+                              </div>
+                              <div className="text-[11px] text-gray-400">
+                                Supplier: <span className="text-gray-600 font-medium">{proc.supplier}</span>
+                              </div>
+                            </div>
+
+                            {/* Footer: Date & Total Cost */}
+                            <div className="flex justify-between items-center gap-2 pt-2 border-t border-gray-50">
+                              <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                                <Clock size={12} />
+                                {proc.date}
+                              </div>
+                              <div className="font-mono text-sm font-bold text-gray-800">
+                                <span className="text-gray-400 text-xs font-normal mr-0.5">Rp</span>
+                                {formatIDR(proc.totalCost).replace('Rp', '').trim()}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    </React.Fragment>
                   ))
                 )}
               </tbody>
@@ -183,14 +234,18 @@ export function Procurement({ masterCatalog, onAddItem, procurementRecords, onAd
 
 function BulkScannerInterface({ 
   onAddItems, 
-  onAddProcurements 
+  onAddProcurements,
+  onOpenScanner
 }: { 
   onAddItems: (items: InventoryItem[]) => void;
   onAddProcurements: (records: ProcurementRecord[]) => void;
+  onOpenScanner?: () => void;
 }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scannedItems, setScannedItems] = useState<(InventoryItem & { tempId: string, supplier: string })[]>([]);
   const [dragActive, setDragActive] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
 
   // Batch Metadata
   const [batchSupplier, setBatchSupplier] = useState('');
@@ -216,6 +271,7 @@ function BulkScannerInterface({
 
   const simulateAIScan = async (files: FileList | File[]) => {
     setIsScanning(true);
+    setScanError(null);
     
     const fileArray = Array.from(files);
 
@@ -280,10 +336,18 @@ function BulkScannerInterface({
             console.error("Failed to parse JSON for tempId", tempId, text);
           }
         } else {
-          console.error("Server API returned error for tempId", tempId, response.status);
+          const text = await response.text();
+          let msg = "AI scan failed. You can continue filling out item details.";
+          try {
+            const jsonErr = JSON.parse(text);
+            if (jsonErr.error) msg = jsonErr.error;
+          } catch (_) {}
+          setScanError(msg);
+          console.error("Server API returned error for tempId", tempId, response.status, text);
         }
       } catch (err) {
         console.error("AI Analysis fetch failed for tempId", tempId, err);
+        setScanError("Network or server connection failed when analyzing card.");
       }
     });
   };
@@ -365,31 +429,74 @@ function BulkScannerInterface({
       >
         <input 
           type="file" 
+          ref={fileInputRef}
           multiple 
           accept="image/*" 
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+          className="hidden"
           onChange={handleFileSelect}
         />
         
-        <div className="flex flex-col items-center justify-center gap-4 pointer-events-none">
-          {isScanning ? (
-            <div className="flex flex-col items-center gap-2 sm:gap-3">
-              <Loader2 className="w-10 h-10 sm:w-12 sm:h-12 text-[#961b2b] animate-spin" />
-              <p className="text-base sm:text-lg font-medium text-gray-900 px-2 text-center">AI Vision Scanner analyzing cards...</p>
+        {isScanning ? (
+          <div className="flex flex-col items-center justify-center gap-2 sm:gap-3 pointer-events-none">
+            <Loader2 className="w-10 h-10 sm:w-12 sm:h-12 text-[#961b2b] animate-spin" />
+            <p className="text-base sm:text-lg font-medium text-gray-900 px-2 text-center">AI Vision Scanner analyzing cards...</p>
+          </div>
+        ) : (
+          <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16">
+            {/* Standard Upload File Area */}
+            <div 
+              onClick={() => fileInputRef.current?.click()}
+              className="group cursor-pointer hover:scale-[1.02] active:scale-[0.98] p-4 rounded-xl transition-all flex flex-col items-center text-center max-w-[280px]"
+            >
+              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-gray-200 transition-colors">
+                <Upload className="w-6 h-6 sm:w-8 sm:h-8 text-gray-500 group-hover:text-gray-700 transition-colors" />
+              </div>
+              <div className="mt-3">
+                <p className="text-sm sm:text-base font-bold text-gray-900 leading-tight">Upload Card Images</p>
+                <p className="text-xs text-gray-500 mt-2">Drag & drop card/slab images or click to select files</p>
+              </div>
             </div>
-          ) : (
-            <>
-              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gray-100 flex items-center justify-center">
-                <Upload className="w-6 h-6 sm:w-8 sm:h-8 text-gray-500" />
+
+            {/* Separator Line */}
+            <div className="hidden md:block h-20 w-px bg-gray-200 self-center" />
+            <div className="md:hidden flex items-center gap-2 w-full max-w-[200px]">
+              <div className="h-px bg-gray-200 flex-1" />
+              <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">or</span>
+              <div className="h-px bg-gray-250 flex-1" />
+            </div>
+
+            {/* QR Scanner Camera Area */}
+            <div className="flex flex-col items-center text-center max-w-[280px]">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenScanner?.();
+                }}
+                className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-[#961b2b]/10 text-[#961b2b] hover:bg-[#961b2b]/20 hover:scale-[1.05] active:scale-[0.95] flex items-center justify-center transition-all cursor-pointer shadow-sm border border-[#961b2b]/20"
+                title="Scan QR Code with Camera"
+              >
+                <Camera className="w-6 h-6 sm:w-8 sm:h-8" />
+              </button>
+              <div className="mt-3">
+                <p className="text-sm sm:text-base font-bold text-gray-900 leading-tight">Bind QR Code via Camera</p>
+                <p className="text-xs text-gray-500 mt-2">Trigger QR camera to bind pre-stickered sleeves instantly</p>
               </div>
-              <div className="px-2">
-                <p className="text-base sm:text-lg font-medium text-gray-900 leading-tight">Drag & Drop Card or Slab Images Here</p>
-                <p className="text-xs sm:text-sm text-gray-500 mt-2">Bulk Upload Supported • JPG, PNG, WEBP</p>
-              </div>
-            </>
-          )}
-        </div>
+            </div>
+          </div>
+        )}
       </div>
+
+      {scanError && (
+        <div className="p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-sm flex items-start gap-2.5 animate-in fade-in slide-in-from-top-1">
+          <span className="text-lg leading-none">⚠️</span>
+          <div className="flex-1">
+            <p className="font-bold">AI Scanner Warning</p>
+            <p className="text-xs text-amber-700 mt-0.5">{scanError}</p>
+          </div>
+          <button onClick={() => setScanError(null)} className="text-amber-500 hover:text-amber-700 font-bold text-xs">Dismiss</button>
+        </div>
+      )}
 
       {/* Pending Review List */}
       {scannedItems.length > 0 && (
@@ -400,7 +507,7 @@ function BulkScannerInterface({
             <h3 className="text-xs font-semibold uppercase tracking-wider text-[#961b2b] mb-4">Batch Settings & Invoice Metadata</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="space-y-2 lg:col-span-2">
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Supplier / Seller</label>
+                <label className="text-sm font-medium text-slate-700">Supplier / Seller</label>
                 <div className="relative">
                   <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
                   <input
@@ -413,7 +520,7 @@ function BulkScannerInterface({
                 </div>
               </div>
               <div className="space-y-2 lg:col-span-1">
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Date & Time</label>
+                <label className="text-sm font-medium text-slate-700">Date & Time</label>
                 <input
                   type="datetime-local"
                   value={batchDate}
@@ -422,18 +529,18 @@ function BulkScannerInterface({
                 />
               </div>
               <div className="space-y-2 lg:col-span-2">
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Delivery Fee (Rp)</label>
+                <label className="text-sm font-medium text-slate-700">Delivery Fee (Rp)</label>
                 <CurrencyInput value={batchDeliveryFee} onChange={setBatchDeliveryFee} className="h-[38px] text-sm bg-[#f2f2f2]" />
               </div>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2 pt-4 border-t border-gray-200">
               <div className="space-y-2">
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">PPN Impor (Rp)</label>
+                <label className="text-sm font-medium text-slate-700">PPN Impor (Rp)</label>
                 <CurrencyInput value={batchPpnImpor} onChange={setBatchPpnImpor} className="h-[38px] text-sm bg-[#f2f2f2]" />
               </div>
               <div className="space-y-2">
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">PPh Impor (Rp)</label>
+                <label className="text-sm font-medium text-slate-700">PPh Impor (Rp)</label>
                 <CurrencyInput value={batchPphImpor} onChange={setBatchPphImpor} className="h-[38px] text-sm bg-[#f2f2f2]" />
               </div>
             </div>
@@ -590,15 +697,11 @@ function ManualEntryForm({
   onAddProcurement: (record: ProcurementRecord) => void;
   initialSerialNumber: string;
 }) {
+  const [step, setStep] = useState(1);
   const [continuousIntake, setContinuousIntake] = useState(false);
   const [serialNumber, setSerialNumber] = useState(initialSerialNumber || '');
   const [successToast, setSuccessToast] = useState('');
-  
-  React.useEffect(() => {
-    if (initialSerialNumber) {
-      setSerialNumber(initialSerialNumber);
-    }
-  }, [initialSerialNumber]);
+  const [scanError, setScanError] = useState<string | null>(null);
   
   const [category, setCategory] = useState('Single'); // 'Single' = Raw Card, 'Slab' = Graded Slab, 'Sealed' = Sealed Product
   const [sealedType, setSealedType] = useState('Sealed Box');
@@ -620,6 +723,15 @@ function ManualEntryForm({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [errors, setErrors] = useState<Record<string, boolean>>({});
   const [showSuggestions, setShowSuggestions] = useState(false);
+
+  // Date acquired defaulting to local today (YYYY-MM-DD)
+  const [acquisitionDate, setAcquisitionDate] = useState(() => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  });
 
   const filteredSuggestions = masterCatalog.filter(c => 
     itemName && c.itemName.toLowerCase().includes(itemName.toLowerCase())
@@ -650,6 +762,7 @@ function ManualEntryForm({
       setImageUrl(URL.createObjectURL(file));
 
       setIsAnalyzing(true);
+      setScanError(null);
       try {
         const formData = new FormData();
         formData.append("image", file);
@@ -675,10 +788,17 @@ function ManualEntryForm({
           }
         } else {
           const text = await response.text();
+          let msg = "AI scan failed. Please input details manually below.";
+          try {
+            const jsonErr = JSON.parse(text);
+            if (jsonErr.error) msg = jsonErr.error;
+          } catch (_) {}
+          setScanError(msg);
           console.error("Server error:", response.status, text);
         }
       } catch (err) {
         console.error("AI Analysis failed:", err);
+        setScanError("Network or server connection failed when analyzing card.");
       } finally {
         setIsAnalyzing(false);
       }
@@ -687,13 +807,16 @@ function ManualEntryForm({
 
   const serialInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSubmit = () => {
+  const validateStep1 = () => {
     const newErrors: Record<string, boolean> = {};
-
     if (!itemName || !itemName.trim()) newErrors.itemName = true;
     if (!cardSetName || !cardSetName.trim()) newErrors.cardSetName = true;
-    if (!costBasis || typeof costBasis !== 'number' || costBasis <= 0) newErrors.costBasis = true;
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
+  const validateStep2 = () => {
+    const newErrors: Record<string, boolean> = {};
     if (category === 'Slab') {
       if (!gradingCompany) newErrors.gradingCompany = true;
       if (!grade || !grade.trim()) newErrors.grade = true;
@@ -701,13 +824,40 @@ function ManualEntryForm({
     } else if (category === 'Single') {
       if (!condition) newErrors.condition = true;
     }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
+  const validateStep3 = () => {
+    const newErrors: Record<string, boolean> = {};
+    if (!costBasis || typeof costBasis !== 'number' || costBasis <= 0) newErrors.costBasis = true;
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = () => {
+    if (!validateStep1()) {
+      setStep(1);
+      return;
+    }
+    if (!validateStep2()) {
+      setStep(2);
+      return;
+    }
+    if (!validateStep3()) {
+      setStep(3);
       return;
     }
 
-    const assignedId = serialNumber && serialNumber.trim() ? serialNumber.trim() : `INV-${Date.now()}`;
+    // Direct, synchronous read from the physical DOM element to prevent stale state issues
+    const activeSerial = serialInputRef.current ? serialInputRef.current.value : serialNumber;
+    const sanitizedSerialNumber = activeSerial.trim().toUpperCase();
+    const assignedId = sanitizedSerialNumber || `INV-${Date.now()}`;
+
+    // Convert acquisitionDate to display string formatting
+    const parts = acquisitionDate.split('-');
+    const selectedDateObj = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    const formattedAcquisitionDate = selectedDateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
     const newItem: InventoryItem = {
       id: assignedId,
@@ -718,18 +868,19 @@ function ManualEntryForm({
       foilType: isBoxOrCase ? 'N/A' : foilType,
       gradingCompany: category === 'Slab' ? gradingCompany : null,
       certNumber: category === 'Slab' ? certNumber : null,
-      quantity: 1, // Default to 1 for single item buy
+      quantity: 1,
       costBasis,
-      currentPrice: 0, // Needs to be set later or defaulted
+      currentPrice: 0,
       imageUrl: imageUrl || null,
       cardNumber: isBoxOrCase ? '' : cardNumber,
       rarity: isBoxOrCase ? '' : rarity,
-      language
+      language,
+      acquisitionDate: formattedAcquisitionDate
     };
 
     const newRecord: ProcurementRecord = {
       id: `PRC-${Date.now()}`,
-      date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+      date: formattedAcquisitionDate,
       type: category === 'Slab' ? 'Graded Slab' : category === 'Sealed' ? sealedType : 'Raw Card',
       itemName: itemName,
       description: `${cardSetName}${!isBoxOrCase && cardNumber ? ` • ${cardNumber}` : ''}`,
@@ -738,15 +889,18 @@ function ManualEntryForm({
     };
 
     onAddProcurement(newRecord);
-    onAddItem({ ...newItem, id: assignedId }); // `id` could change if stacked, but `onAddItem` handles creating newBatch with assignedId via changes there? Wait, `onAddItem` will use Date.now() for the batchid. We should pass the batchId explicitly or we can modify `onAddItem` to check if `newItem.id` starts with 'INV-' or 'SN-' and use it? No, in App.tsx `onAddItem` uses `id` for new items, but batch gets `BCH-Date.now()`. I'll pass a special field `boundBatchId`. Wait, I can just use `newItem.id` as the batch Id in App.tsx!
+    onAddItem({ ...newItem, id: assignedId });
 
     if (continuousIntake) {
       setSuccessToast(`Bound to ${assignedId}`);
       setTimeout(() => setSuccessToast(''), 3000);
       setSerialNumber('');
+      if (serialInputRef.current) {
+        serialInputRef.current.value = '';
+      }
       setTimeout(() => serialInputRef.current?.focus(), 50);
+      setStep(1);
     } else {
-      // Reset form
       setItemName('');
       setCardSetName('');
       setImageUrl('');
@@ -762,6 +916,10 @@ function ManualEntryForm({
       setGradingCompany('');
       setGrade('');
       setSerialNumber('');
+      if (serialInputRef.current) {
+        serialInputRef.current.value = '';
+      }
+      setStep(1);
     }
     setErrors({});
   };
@@ -769,39 +927,63 @@ function ManualEntryForm({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      handleSubmit();
+      if (step === 1) {
+        if (validateStep1()) setStep(2);
+      } else if (step === 2) {
+        if (validateStep2()) setStep(3);
+      } else if (step === 3) {
+        handleSubmit();
+      }
     }
   };
 
+  const steps = [
+    { number: 1, label: 'Identity' },
+    { number: 2, label: 'Attributes' },
+    { number: 3, label: 'Financials' }
+  ];
+
   return (
-    <div className="space-y-4 max-w-4xl">
-      {/* Intake Toggle & Serial Number Setup */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
-        <div className="flex items-center gap-3">
-          <div 
-            className={`w-10 h-5 flex items-center rounded-full p-1 cursor-pointer transition-colors ${continuousIntake ? 'bg-[#961b2b]' : 'bg-gray-300'}`}
-            onClick={() => setContinuousIntake(!continuousIntake)}
-          >
-            <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform ${continuousIntake ? 'translate-x-5' : 'translate-x-0'}`} />
+    <div className="space-y-6 max-w-4xl" onKeyDown={handleKeyDown}>
+      {/* Wizard Progress Index */}
+      <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center justify-between w-full">
+            {steps.map((st, sIdx) => {
+              const isActive = step === st.number;
+              const isCompleted = step > st.number;
+              
+              return (
+                <React.Fragment key={st.number}>
+                  <div className="flex items-center gap-2">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border transition-all duration-300 ${
+                      isActive 
+                        ? 'bg-[#961b2b] text-white border-[#961b2b]' 
+                        : isCompleted 
+                          ? 'bg-emerald-500 text-white border-emerald-500' 
+                          : 'bg-white text-gray-400 border-gray-200'
+                    }`}>
+                      {isCompleted ? <Check size={14} /> : st.number}
+                    </div>
+                    <div className="text-left leading-tight">
+                      <span className={`text-[9px] uppercase tracking-wider font-semibold block ${isActive ? 'text-[#961b2b]' : isCompleted ? 'text-emerald-600' : 'text-gray-400'}`}>
+                        Step {st.number}
+                      </span>
+                      <span className={`text-xs font-bold block ${isActive ? 'text-gray-950' : isCompleted ? 'text-gray-700' : 'text-gray-400'}`}>
+                        {st.label}
+                      </span>
+                    </div>
+                  </div>
+                  {sIdx < steps.length - 1 && (
+                    <div className={`flex-1 mx-2 sm:mx-4 h-0.5 transition-all duration-500 ${step > st.number ? 'bg-emerald-500' : 'bg-gray-200'}`} />
+                  )}
+                </React.Fragment>
+              );
+            })}
           </div>
-          <span className="text-sm font-medium text-gray-700">Continuous Intake (Lock Details)</span>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Bind to QR/Serial (Optional):</label>
-          <input
-            type="text"
-            ref={serialInputRef}
-            value={serialNumber}
-            onChange={(e) => setSerialNumber(e.target.value.toUpperCase())}
-            onKeyDown={handleKeyDown}
-            placeholder="e.g. SN-001"
-            className="w-32 bg-white border border-[#e0e0e0] rounded px-2 py-1 text-xs text-gray-900 focus:outline-none focus:border-[#961b2b] uppercase font-mono"
-            autoFocus
-          />
         </div>
       </div>
-      
+
       {successToast && (
         <div className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-lg text-sm font-medium animate-in fade-in slide-in-from-top-2 border border-emerald-200 flex items-center gap-2">
           <Check size={16} />
@@ -809,320 +991,420 @@ function ManualEntryForm({
         </div>
       )}
 
-      {/* Top Section: Image + Name + Set + Category */}
-      <div className="grid grid-cols-1 md:grid-cols-[120px_1fr] gap-4">
-        {/* Card Image */}
-        <div className="space-y-1 flex-shrink-0">
-          <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 flex items-center">
-            Image
-            {isAnalyzing && <span className="ml-1 text-[#961b2b] animate-pulse normal-case text-[10px]">...</span>}
-          </label>
-          <div className="w-full md:w-[120px] h-[120px] rounded bg-white border border-[#e0e0e0] flex items-center justify-center overflow-hidden relative group transition-all focus-within:border-[#961b2b]">
-            {imageUrl ? (
-              <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-            ) : (
-              <div className="flex flex-col items-center gap-1 text-gray-400">
-                <ImageIcon size={20} />
-                <span className="text-[9px] uppercase font-semibold">Upload</span>
-              </div>
-            )}
-            {isAnalyzing && (
-              <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
-                <Loader2 className="w-5 h-5 text-[#961b2b] animate-spin" />
-              </div>
-            )}
-            {imageUrl && !isAnalyzing && (
-              <button 
-                onClick={(e) => {
-                  e.preventDefault();
-                  setImageUrl('');
-                  setImageFile(null);
-                  if (fileInputRef.current) fileInputRef.current.value = '';
-                }}
-                className="absolute inset-0 bg-white/80 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
-              >
-                <Trash2 size={20} className="text-[#961b2b]" />
-              </button>
-            )}
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleImageUpload}
-              ref={fileInputRef}
-              tabIndex={1}
-              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-            />
+      {scanError && (
+        <div className="p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-sm flex items-start gap-2.5 animate-in fade-in slide-in-from-top-1">
+          <span className="text-lg leading-none">⚠️</span>
+          <div className="flex-1">
+            <p className="font-bold">AI Scanner Warning</p>
+            <p className="text-xs text-amber-700 mt-0.5">{scanError}</p>
           </div>
+          <button onClick={() => setScanError(null)} className="text-amber-500 hover:text-amber-700 font-bold text-xs">Dismiss</button>
         </div>
+      )}
 
-      {/* Core Info Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 content-end">
-        <div className="flex flex-col gap-1 md:col-span-2 relative">
-          <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Item Name</label>
-          <div className="relative">
-            <input
-              type="text"
-              value={itemName}
-              onChange={(e) => { 
-                setItemName(e.target.value); 
-                setShowSuggestions(true);
-                clearError('itemName'); 
-              }}
-              onFocus={() => setShowSuggestions(true)}
-              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-              tabIndex={2}
-              placeholder="e.g. Charizard ex"
-              className={`w-full bg-white border ${errors.itemName ? '!border-[#961b2b]' : 'border-[#e0e0e0]'} rounded px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-[#961b2b] transition-all block placeholder-gray-400`}
-            />
-            
-            <AnimatePresence>
-              {showSuggestions && filteredSuggestions.length > 0 && (
-                <motion.div
-                  initial={{ opacity: 0, y: -5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -5 }}
-                  className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
-                >
-                  {filteredSuggestions.map((suggestion, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => handleSelectSuggestion(suggestion)}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-900 hover:bg-[#961b2b]/10 hover:text-[#961b2b] focus:bg-[#961b2b]/10 focus:text-[#961b2b] focus:outline-none transition-colors border-b border-gray-50 last:border-0"
-                    >
-                      <div className="font-semibold">{suggestion.itemName}</div>
-                      <div className="text-[10px] text-gray-500 flex items-center gap-2">
-                        <span>{suggestion.setName}</span>
-                        {suggestion.cardNumber && <span>• {suggestion.cardNumber}</span>}
-                        {suggestion.rarity && <span>• {suggestion.rarity}</span>}
+      {/* Wizard Content Segment with motion animations */}
+      <div className="min-h-[220px] bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
+        <AnimatePresence mode="wait">
+          {step === 1 && (
+            <motion.div
+              key="step1"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.15 }}
+              className="space-y-6"
+            >
+              {/* Top Row: Intake and Serial setup */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
+                <div className="flex items-center gap-3">
+                  <div 
+                    className={`w-10 h-5 flex items-center rounded-full p-1 cursor-pointer transition-colors ${continuousIntake ? 'bg-[#961b2b]' : 'bg-gray-300'}`}
+                    onClick={() => setContinuousIntake(!continuousIntake)}
+                  >
+                    <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform ${continuousIntake ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </div>
+                  <span className="text-sm font-medium text-gray-700">Continuous Intake (Lock Details)</span>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-slate-700">Bind to QR/Serial (Optional):</label>
+                  <input
+                    type="text"
+                    ref={serialInputRef}
+                    value={serialNumber}
+                    onChange={(e) => setSerialNumber(e.target.value.toUpperCase())}
+                    placeholder="e.g. SN-001"
+                    className="w-32 bg-white border border-[#e0e0e0] rounded px-2 py-1 text-xs text-gray-900 focus:outline-none focus:border-[#961b2b] uppercase font-mono"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              {/* Main Fields: Photo upload and basic metadata */}
+              <div className="grid grid-cols-1 md:grid-cols-[130px_1fr] gap-6">
+                <div className="space-y-1 flex-shrink-0">
+                  <label className="text-sm font-medium text-slate-700 flex items-center">
+                    Image File
+                    {isAnalyzing && <span className="ml-1 text-[#961b2b] animate-pulse text-xs">...</span>}
+                  </label>
+                  <div className="w-full md:w-[130px] h-[130px] rounded-lg bg-gray-50 border border-dashed border-gray-200 flex items-center justify-center overflow-hidden relative group transition-all">
+                    {imageUrl ? (
+                      <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      <div className="flex flex-col items-center gap-1 text-gray-400 text-center p-2">
+                        <ImageIcon size={22} className="text-gray-400" />
+                        <span className="text-[9px] uppercase font-bold tracking-wide">Upload Image</span>
                       </div>
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-          {errors.itemName && <span className="absolute -bottom-4 right-0 text-[10px] font-bold text-[#961b2b]">REQUIRED</span>}
-        </div>
-        <div className={`flex flex-col gap-1 relative ${category === 'Sealed' ? 'md:col-span-2' : ''}`}>
-          <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Set Name</label>
-          <input
-            type="text"
-            value={cardSetName}
-            onChange={(e) => { setCardSetName(e.target.value); clearError('cardSetName'); }}
-            tabIndex={3}
-            placeholder="e.g. 151, Obsidian Flames"
-            className={`w-full bg-white border ${errors.cardSetName ? '!border-[#961b2b]' : 'border-[#e0e0e0]'} rounded px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-[#961b2b] transition-all placeholder-gray-400`}
-          />
-          {errors.cardSetName && <span className="absolute -bottom-4 right-0 text-[10px] font-bold text-[#961b2b]">REQUIRED</span>}
-        </div>
-        <div className="space-y-1">
-          <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Category</label>
-          <select 
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            tabIndex={4}
-            className="w-full bg-white border border-[#e0e0e0] rounded px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-[#961b2b] transition-all appearance-none"
-          >
-            <option value="Single">Raw Card</option>
-            <option value="Slab">Graded Slab</option>
-            <option value="Sealed">Sealed Product</option>
-          </select>
-        </div>
-        {category === 'Sealed' && (
-          <div className="space-y-1">
-            <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Sealed Type</label>
-            <select 
-              value={sealedType}
-              onChange={(e) => setSealedType(e.target.value)}
-              tabIndex={5}
-              className="w-full bg-white border border-[#e0e0e0] rounded px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-[#961b2b] transition-all appearance-none"
+                    )}
+                    {isAnalyzing && (
+                      <div className="absolute inset-0 bg-white/85 flex items-center justify-center">
+                        <Loader2 className="w-5 h-5 text-[#961b2b] animate-spin" />
+                      </div>
+                    )}
+                    {imageUrl && !isAnalyzing && (
+                      <button 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setImageUrl('');
+                          setImageFile(null);
+                          if (fileInputRef.current) fileInputRef.current.value = '';
+                        }}
+                        className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
+                      >
+                        <Trash2 size={22} className="text-white" />
+                      </button>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      ref={fileInputRef}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 content-end">
+                  <div className="flex flex-col gap-1 relative">
+                    <label className="text-sm font-medium text-slate-700">Item Name</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={itemName}
+                        onChange={(e) => { 
+                          setItemName(e.target.value); 
+                          setShowSuggestions(true);
+                          clearError('itemName'); 
+                        }}
+                        onFocus={() => setShowSuggestions(true)}
+                        onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                        placeholder="e.g. Charizard ex"
+                        className={`w-full bg-white border ${errors.itemName ? '!border-[#961b2b]' : 'border-[#e0e0e0]'} rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-[#961b2b] transition-all block placeholder-gray-400`}
+                      />
+                      
+                      <AnimatePresence>
+                        {showSuggestions && filteredSuggestions.length > 0 && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -5 }}
+                            className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto"
+                          >
+                            {filteredSuggestions.map((suggestion, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => handleSelectSuggestion(suggestion)}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-900 hover:bg-[#961b2b]/10 hover:text-[#961b2b] focus:bg-[#961b2b]/10 focus:text-[#961b2b] focus:outline-none transition-colors border-b border-gray-50 last:border-0"
+                              >
+                                <div className="font-semibold text-xs text-gray-800">{suggestion.itemName}</div>
+                                <div className="text-[10px] text-gray-500 flex items-center gap-2">
+                                  <span>{suggestion.setName}</span>
+                                  {suggestion.cardNumber && <span>• {suggestion.cardNumber}</span>}
+                                  {suggestion.rarity && <span>• {suggestion.rarity}</span>}
+                                </div>
+                              </button>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                    {errors.itemName && <span className="absolute -bottom-4 right-0 text-[10px] font-bold text-[#961b2b]">REQUIRED</span>}
+                  </div>
+
+                  <div className="flex flex-col gap-1 relative">
+                    <label className="text-sm font-medium text-slate-700">Set Name</label>
+                    <input
+                      type="text"
+                      value={cardSetName}
+                      onChange={(e) => { setCardSetName(e.target.value); clearError('cardSetName'); }}
+                      placeholder="e.g. 151, Scarlet & Violet"
+                      className={`w-full bg-white border ${errors.cardSetName ? '!border-[#961b2b]' : 'border-[#e0e0e0]'} rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-[#961b2b] transition-all placeholder-gray-400`}
+                    />
+                    {errors.cardSetName && <span className="absolute -bottom-4 right-0 text-[10px] font-bold text-[#961b2b]">REQUIRED</span>}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {step === 2 && (
+            <motion.div
+              key="step2"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.15 }}
+              className="space-y-6"
             >
-              <option value="Sealed Box">Sealed Box</option>
-              <option value="Sealed Case">Sealed Case</option>
-              <option value="Sealed Promo/Single">Sealed Promo/Single</option>
-            </select>
-          </div>
-        )}
-      </div>
+              {/* Category selector row */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-slate-700">Category</label>
+                  <select 
+                    value={category}
+                    onChange={(e) => {
+                      setCategory(e.target.value);
+                      clearError('condition');
+                    }}
+                    className="w-full bg-white border border-[#e0e0e0] rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-[#961b2b] transition-all appearance-none"
+                  >
+                    <option value="Single">Raw Card</option>
+                    <option value="Slab">Graded Slab</option>
+                    <option value="Sealed">Sealed Product</option>
+                  </select>
+                </div>
+                {category === 'Sealed' && (
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-slate-700">Sealed Type</label>
+                    <select 
+                      value={sealedType}
+                      onChange={(e) => setSealedType(e.target.value)}
+                      className="w-full bg-white border border-[#e0e0e0] rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-[#961b2b] transition-all appearance-none"
+                    >
+                      <option value="Sealed Box">Sealed Box</option>
+                      <option value="Sealed Case">Sealed Case</option>
+                      <option value="Sealed Promo/Single">Sealed Promo/Single</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Attributes layout */}
+              <div className={`grid grid-cols-2 ${!isBoxOrCase ? 'md:grid-cols-5' : 'md:grid-cols-2'} gap-4`}>
+                {!isBoxOrCase && (
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-slate-700">Card Number</label>
+                    <input
+                      type="text"
+                      value={cardNumber}
+                      onChange={(e) => { setCardNumber(e.target.value.replace(/[^\d\/-]/g, '')); }}
+                      placeholder="e.g. 199/165"
+                      className="w-full bg-white border border-[#e0e0e0] rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-[#961b2b] transition-all placeholder-gray-400"
+                    />
+                  </div>
+                )}
+                {!isBoxOrCase && (
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-slate-700">Rarity</label>
+                    <input
+                      type="text"
+                      value={rarity}
+                      onChange={(e) => setRarity(e.target.value)}
+                      placeholder="e.g. SIR"
+                      className="w-full bg-white border border-[#e0e0e0] rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-[#961b2b] transition-all placeholder-gray-400"
+                    />
+                  </div>
+                )}
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-slate-700">Language</label>
+                  <select 
+                    value={language}
+                    onChange={(e) => setLanguage(e.target.value)}
+                    className="w-full bg-white border border-[#e0e0e0] rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-[#961b2b] transition-all appearance-none"
+                  >
+                    <option value="English">English</option>
+                    <option value="Japanese">Japanese</option>
+                    <option value="Indonesian">Indonesian</option>
+                    <option value="Traditional Chinese">Traditional Chinese</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1 relative">
+                  <label className="text-sm font-medium text-slate-700">Condition</label>
+                  {category === 'Single' ? (
+                    <select 
+                      value={condition}
+                      onChange={(e) => { setCondition(e.target.value); clearError('condition'); }}
+                      className={`w-full bg-white border ${errors.condition ? '!border-[#961b2b]' : 'border-[#e0e0e0]'} rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-[#961b2b] transition-all appearance-none`}
+                    >
+                      <option value="NM">Near Mint (NM)</option>
+                      <option value="LP">Lightly Played (LP)</option>
+                      <option value="MP">Moderately Played (MP)</option>
+                      <option value="HP">Heavily Played (HP)</option>
+                      <option value="DMG">Damaged (DMG)</option>
+                    </select>
+                  ) : (
+                    <div className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-400 cursor-not-allowed">
+                      Auto (Grade)
+                    </div>
+                  )}
+                </div>
+                {!isBoxOrCase && (
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-slate-700">Foil Type</label>
+                    <select 
+                      value={foilType}
+                      onChange={(e) => setFoilType(e.target.value)}
+                      className="w-full bg-white border border-[#e0e0e0] rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-[#961b2b] transition-all appearance-none"
+                    >
+                      <option value="Non-Foil">Non-Foil</option>
+                      <option value="Reverse Holo">Reverse Holo</option>
+                      <option value="Holo">Holo</option>
+                      <option value="Textured">Textured / Full Art</option>
+                      <option value="N/A">N/A</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Slab specifics */}
+              {category === 'Slab' && (
+                <div className="pt-4 border-t border-gray-100 animate-in slide-in-from-top-1 duration-200">
+                  <h4 className="text-xs font-bold text-[#961b2b] uppercase tracking-wider mb-2">Graded Slab Information</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="flex flex-col gap-1 relative">
+                      <label className="text-sm font-medium text-slate-700">Grading Company</label>
+                      <select 
+                        value={gradingCompany}
+                        onChange={(e) => { setGradingCompany(e.target.value); clearError('gradingCompany'); }}
+                        className={`w-full bg-white border ${errors.gradingCompany ? '!border-[#961b2b]' : 'border-[#e0e0e0]'} rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-[#961b2b] transition-all appearance-none`}
+                      >
+                        <option value="" disabled>Select company...</option>
+                        <option value="PSA">PSA</option>
+                        <option value="BGS">BGS</option>
+                        <option value="CGC">CGC</option>
+                        <option value="SGC">SGC</option>
+                        <option value="PCG">PCG</option>
+                      </select>
+                      {errors.gradingCompany && <span className="absolute -bottom-4 right-0 text-[10px] font-bold text-[#961b2b]">REQUIRED</span>}
+                    </div>
+                    <div className="flex flex-col gap-1 relative">
+                      <label className="text-sm font-medium text-slate-700">Grade</label>
+                      <input
+                        type="text"
+                        value={grade}
+                        onChange={(e) => { setGrade(e.target.value.replace(/[^\d.]/g, '')); clearError('grade'); }}
+                        placeholder="e.g. 10, 9.5"
+                        className={`w-full bg-white border ${errors.grade ? '!border-[#961b2b]' : 'border-[#e0e0e0]'} rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#961b2b] transition-all`}
+                      />
+                      {errors.grade && <span className="absolute -bottom-4 right-0 text-[10px] font-bold text-[#961b2b]">REQUIRED</span>}
+                    </div>
+                    <div className="flex flex-col gap-1 relative">
+                      <label className="text-sm font-medium text-slate-700">Cert Number</label>
+                      <input
+                        type="text"
+                        value={certNumber}
+                        onChange={(e) => { setCertNumber(e.target.value.replace(/\D/g, '')); clearError('certNumber'); }}
+                        placeholder="e.g. 84729104"
+                        className={`w-full bg-white border ${errors.certNumber ? '!border-[#961b2b]' : 'border-[#e0e0e0]'} rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#961b2b] transition-all font-mono`}
+                      />
+                      {errors.certNumber && <span className="absolute -bottom-4 right-0 text-[10px] font-bold text-[#961b2b]">REQUIRED</span>}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {step === 3 && (
+            <motion.div
+              key="step3"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.15 }}
+              className="space-y-6"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="flex flex-col gap-1 relative">
+                  <label className="text-sm font-medium text-slate-700">Cost Basis (Amt Paid)</label>
+                  <CurrencyInput 
+                    value={costBasis} 
+                    onChange={(val) => { setCostBasis(val); clearError('costBasis'); }} 
+                    className={`w-full h-[38px] bg-white border ${errors.costBasis ? '!border-[#961b2b]' : 'border-[#e0e0e0]'} rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-[#961b2b] transition-all`}
+                  />
+                  {errors.costBasis && <span className="absolute -bottom-4 right-0 text-[10px] font-bold text-[#961b2b]">REQUIRED</span>}
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-slate-700">Supplier / Seller</label>
+                  <input
+                    type="text"
+                    value={supplier}
+                    onChange={(e) => setSupplier(e.target.value)}
+                    placeholder="Walk-in, Distributor, etc."
+                    className="w-full bg-white border border-[#e0e0e0] rounded-lg px-3 py-2 text-sm text-gray-900 h-[38px] placeholder-gray-400 focus:outline-none focus:border-[#961b2b] transition-all"
+                  />
+                </div>
+                {/* Backdated Date picker input */}
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-slate-700 flex items-center gap-1">
+                    <Calendar size={12} />
+                    Date Acquired (Procurement Date)
+                  </label>
+                  <input
+                    type="date"
+                    value={acquisitionDate}
+                    onChange={(e) => setAcquisitionDate(e.target.value)}
+                    className="w-full bg-white border border-[#e0e0e0] rounded-lg px-3 py-2 text-sm text-gray-800 h-[38px] focus:outline-none focus:border-[#961b2b] transition-all appearance-none"
+                    max={new Date().toISOString().split('T')[0]} // Reject future planning
+                  />
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* Attribute Grid Row */}
-      <div className={`grid grid-cols-2 ${!isBoxOrCase ? 'md:grid-cols-5' : 'md:grid-cols-2'} gap-4`}>
-        {!isBoxOrCase && (
-          <div className="space-y-1">
-            <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Card Number</label>
-            <input
-              type="text"
-              value={cardNumber}
-              onChange={(e) => { setCardNumber(e.target.value.replace(/[^\d\/-]/g, '')); clearError('cardNumber'); }}
-              tabIndex={6}
-              placeholder="e.g. 199/165"
-              className="w-full bg-white border border-[#e0e0e0] rounded px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-[#961b2b] transition-all placeholder-gray-400"
-            />
-          </div>
-        )}
-        {!isBoxOrCase && (
-          <div className="space-y-1">
-            <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Rarity</label>
-            <input
-              type="text"
-              value={rarity}
-              onChange={(e) => setRarity(e.target.value)}
-              tabIndex={7}
-              placeholder="e.g. SIR"
-              className="w-full bg-white border border-[#e0e0e0] rounded px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-[#961b2b] transition-all placeholder-gray-400"
-            />
-          </div>
-        )}
-        <div className="space-y-1">
-          <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Language</label>
-          <select 
-            value={language}
-            onChange={(e) => setLanguage(e.target.value)}
-            tabIndex={8}
-            className="w-full bg-white border border-[#e0e0e0] rounded px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-[#961b2b] transition-all appearance-none"
-          >
-            <option value="English">English</option>
-            <option value="Japanese">Japanese</option>
-            <option value="Indonesian">Indonesian</option>
-            <option value="Traditional Chinese">Traditional Chinese</option>
-          </select>
-        </div>
-        <div className="flex flex-col gap-1 relative">
-          <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Condition</label>
-          {category === 'Single' ? (
-            <select 
-              value={condition}
-              onChange={(e) => { setCondition(e.target.value); clearError('condition'); }}
-              tabIndex={9}
-              className={`w-full bg-white border ${errors.condition ? '!border-[#961b2b]' : 'border-[#e0e0e0]'} rounded px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-[#961b2b] transition-all appearance-none`}
+      {/* Buttons */}
+      <div className="flex justify-between items-center pt-4 border-t border-gray-150">
+        <div>
+          {step > 1 && (
+            <button
+              onClick={() => {
+                setErrors({});
+                setStep(prev => prev - 1);
+              }}
+              className="px-5 py-2 text-xs font-bold bg-white text-gray-700 hover:bg-gray-50 border border-gray-200 rounded-lg shadow-sm transition-all duration-150 min-h-[40px]"
             >
-              <option value="NM">Near Mint (NM)</option>
-              <option value="LP">Lightly Played (LP)</option>
-              <option value="MP">Moderately Played (MP)</option>
-              <option value="HP">Heavily Played (HP)</option>
-              <option value="DMG">Damaged (DMG)</option>
-            </select>
-          ) : (
-            <div className="w-full bg-gray-50 border border-gray-200 rounded px-3 py-2 text-sm text-gray-400 cursor-not-allowed">
-              N/A
-            </div>
+              Back
+            </button>
           )}
         </div>
-        {!isBoxOrCase && (
-          <div className="space-y-1">
-            <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Foil Type</label>
-            <select 
-              value={foilType}
-              onChange={(e) => setFoilType(e.target.value)}
-              tabIndex={10}
-              className="w-full bg-white border border-[#e0e0e0] rounded px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-[#961b2b] transition-all appearance-none"
+
+        <div className="flex items-center gap-2">
+          {step < 3 ? (
+            <button
+              onClick={() => {
+                if (step === 1) {
+                  if (validateStep1()) setStep(2);
+                } else if (step === 2) {
+                  if (validateStep2()) setStep(3);
+                }
+              }}
+              className="px-6 py-2 text-xs font-semibold bg-[#961b2b] text-white rounded-lg hover:bg-[#961b2b]/95 shadow transition-all duration-150 min-h-[40px]"
             >
-              <option value="Non-Foil">Non-Foil</option>
-              <option value="Reverse Holo">Reverse Holo</option>
-              <option value="Holo">Holo</option>
-              <option value="Textured">Textured / Full Art</option>
-              <option value="N/A">N/A</option>
-            </select>
-          </div>
-        )}
-      </div>
-
-      {/* Conditional Slab Fields */}
-      <AnimatePresence>
-        {category === 'Slab' && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden"
-          >
-            <div className="pt-2">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="flex flex-col gap-1 relative">
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Grading Company</label>
-                  <select 
-                    value={gradingCompany}
-                    onChange={(e) => { setGradingCompany(e.target.value); clearError('gradingCompany'); }}
-                    tabIndex={10}
-                    className={`w-full bg-white border ${errors.gradingCompany ? '!border-[#961b2b]' : 'border-[#e0e0e0]'} rounded px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-[#961b2b] transition-all appearance-none`}
-                  >
-                    <option value="" disabled>Select...</option>
-                    <option value="PSA">PSA</option>
-                    <option value="BGS">BGS</option>
-                    <option value="CGC">CGC</option>
-                    <option value="SGC">SGC</option>
-                    <option value="PCG">PCG</option>
-                  </select>
-                  {errors.gradingCompany && <span className="absolute -bottom-4 right-0 text-[10px] font-bold text-[#961b2b]">REQUIRED</span>}
-                </div>
-                <div className="flex flex-col gap-1 relative">
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Grade</label>
-                  <input
-                    type="text"
-                    value={grade}
-                    onChange={(e) => { setGrade(e.target.value.replace(/[^\d.]/g, '')); clearError('grade'); }}
-                    tabIndex={11}
-                    placeholder="e.g. 10, 9.5"
-                    className={`w-full bg-white border ${errors.grade ? '!border-[#961b2b]' : 'border-[#e0e0e0]'} rounded px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#961b2b] transition-all`}
-                  />
-                  {errors.grade && <span className="absolute -bottom-4 right-0 text-[10px] font-bold text-[#961b2b]">REQUIRED</span>}
-                </div>
-                <div className="flex flex-col gap-1 relative">
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Cert Number</label>
-                  <input
-                    type="text"
-                    value={certNumber}
-                    onChange={(e) => { setCertNumber(e.target.value.replace(/\D/g, '')); clearError('certNumber'); }}
-                    tabIndex={12}
-                    placeholder="e.g. 84729104"
-                    className={`w-full bg-white border ${errors.certNumber ? '!border-[#961b2b]' : 'border-[#e0e0e0]'} rounded px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#961b2b] transition-all font-mono`}
-                  />
-                  {errors.certNumber && <span className="absolute -bottom-4 right-0 text-[10px] font-bold text-[#961b2b]">REQUIRED</span>}
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Financial Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-[#e0e0e0] pt-4">
-        <div className="flex flex-col gap-1 relative">
-          <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Cost Basis (Amt Paid)</label>
-          <CurrencyInput 
-            value={costBasis} 
-            onChange={(val) => { setCostBasis(val); clearError('costBasis'); }} 
-            tabIndex={13} 
-            onKeyDown={handleKeyDown}
-            className={`w-full bg-white border ${errors.costBasis ? '!border-[#961b2b]' : 'border-[#e0e0e0]'} rounded px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-[#961b2b] transition-all`}
-          />
-          {errors.costBasis && <span className="absolute -bottom-4 right-0 text-[10px] font-bold text-[#961b2b]">REQUIRED</span>}
+              Next
+            </button>
+          ) : (
+            <button
+              onClick={handleSubmit}
+              className="flex items-center gap-2 px-6 py-2 text-xs font-bold bg-[#961b2b] text-gray-100 rounded-lg hover:bg-[#961b2b]/95 shadow-lg shadow-[#961b2b]/15 transition-all duration-150 min-h-[40px]"
+            >
+              <Plus size={15} />
+              Add to Inventory
+            </button>
+          )}
         </div>
-        <div className="space-y-1">
-          <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Supplier / Seller</label>
-          <input
-            type="text"
-            value={supplier}
-            onChange={(e) => setSupplier(e.target.value)}
-            onKeyDown={handleKeyDown}
-            tabIndex={14}
-            placeholder="Walk-in, Distributor, etc."
-            className="w-full bg-white border border-[#e0e0e0] rounded px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#961b2b] transition-all"
-          />
-        </div>
-      </div>
-
-      <div className="pt-2 flex justify-end">
-        <button 
-          onClick={handleSubmit}
-          tabIndex={15}
-          className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold bg-[#961b2b] text-gray-100 rounded hover:bg-[#961b2b]/90 transition-all"
-        >
-          <Plus size={16} />
-          Add to Inventory
-        </button>
       </div>
     </div>
   );

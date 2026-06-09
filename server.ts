@@ -67,6 +67,21 @@ async function startServer() {
       res.json(parsed);
     } catch (error: any) {
       console.error("Error analyzing card:", error);
+      const errStr = typeof error === 'object' ? JSON.stringify(error) : String(error);
+      const isQuotaMessage = (error?.message && (
+        error.message.includes("credits are depleted") ||
+        error.message.includes("429") ||
+        error.message.includes("quota") ||
+        error.message.includes("RESOURCE_EXHAUSTED") ||
+        error.message.includes("prepayment")
+      )) || errStr.includes("prepayment") || errStr.includes("credits are depleted") || errStr.includes("RESOURCE_EXHAUSTED") || error?.status === 429;
+
+      if (isQuotaMessage) {
+        return res.status(429).json({ 
+          error: "Gemini AI billing limits/prepayment credits are depleted. Please input the card's details manually below.",
+          isQuota: true
+        });
+      }
       res.status(500).json({ error: error.message || "Failed to analyze card" });
     }
   });
