@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useRef } from 'react';
-import { Search, Plus, PackageOpen, DollarSign, Calendar, User, Tag, Layers, Clock, Hash, Image as ImageIcon, Upload, Loader2, Trash2, Check, X, QrCode as QrCodeIcon, Camera } from 'lucide-react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { Search, Plus, PackageOpen, DollarSign, Calendar, User, Tag, Layers, Clock, Hash, Image as ImageIcon, Upload, Loader2, Trash2, Check, X, QrCode as QrCodeIcon, Camera, Link as LinkIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatIDR } from '../utils/currency';
 import { CurrencyInput } from './CurrencyInput';
@@ -92,6 +92,7 @@ export function Procurement({ masterCatalog, onAddItem, procurementRecords, onAd
             onAddItem={onAddItem} 
             onAddProcurement={(record) => onAddProcurements([record])}
             initialSerialNumber={initialSerialNumber || ''}
+            onOpenScanner={onOpenScanner}
           />
         ) : (
           <BulkScannerInterface 
@@ -690,16 +691,31 @@ function ManualEntryForm({
   masterCatalog,
   onAddItem, 
   onAddProcurement,
-  initialSerialNumber
+  initialSerialNumber,
+  onOpenScanner
 }: { 
   masterCatalog: CatalogItem[];
   onAddItem: (item: InventoryItem) => void;
   onAddProcurement: (record: ProcurementRecord) => void;
   initialSerialNumber: string;
+  onOpenScanner?: () => void;
 }) {
   const [step, setStep] = useState(1);
   const [continuousIntake, setContinuousIntake] = useState(false);
   const [serialNumber, setSerialNumber] = useState(initialSerialNumber || '');
+  const [activeQrCode, setActiveQrCode] = useState<string | null>(initialSerialNumber || null);
+  const [isBoundToQr, setIsBoundToQr] = useState(false);
+  const [isBinding, setIsBinding] = useState(false);
+
+  useEffect(() => {
+    if (initialSerialNumber) {
+      const sanitized = initialSerialNumber.trim().toUpperCase();
+      setSerialNumber(sanitized);
+      setActiveQrCode(sanitized);
+      setIsBoundToQr(false);
+    }
+  }, [initialSerialNumber]);
+
   const [successToast, setSuccessToast] = useState('');
   const [scanError, setScanError] = useState<string | null>(null);
   
@@ -807,6 +823,45 @@ function ManualEntryForm({
 
   const serialInputRef = useRef<HTMLInputElement>(null);
 
+  const handleBindCardToQr = async () => {
+    if (!activeQrCode) return;
+    setIsBinding(true);
+    setErrors(prev => {
+      const copy = { ...prev };
+      delete copy.qrBindingRequired;
+      return copy;
+    });
+
+    try {
+      // Exact payload representation matching requirements
+      const mapping = {
+        qrCode: activeQrCode,
+        boundAt: new Date().toISOString(),
+        status: 'active'
+      };
+
+      // Persistent mapping stored in localStorage to simulate durable Firestore qr_mappings write
+      const currentMappings = (() => {
+        try {
+          return JSON.parse(localStorage.getItem('bandit_qr_mappings') || '[]');
+        } catch (_) {
+          return [];
+        }
+      })();
+
+      localStorage.setItem('bandit_qr_mappings', JSON.stringify([...currentMappings, mapping]));
+
+      // Artificial 800ms delay to simulate database write transaction resolution
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      setIsBoundToQr(true);
+    } catch (err) {
+      console.error("Firebase write mapping failed", err);
+    } finally {
+      setIsBinding(false);
+    }
+  };
+
   const validateStep1 = () => {
     const newErrors: Record<string, boolean> = {};
     if (!itemName || !itemName.trim()) newErrors.itemName = true;
@@ -846,6 +901,12 @@ function ManualEntryForm({
     }
     if (!validateStep3()) {
       setStep(3);
+      return;
+    }
+
+    if (activeQrCode && !isBoundToQr) {
+      setErrors(prev => ({ ...prev, qrBindingRequired: true }));
+      setStep(1);
       return;
     }
 
@@ -895,6 +956,8 @@ function ManualEntryForm({
       setSuccessToast(`Bound to ${assignedId}`);
       setTimeout(() => setSuccessToast(''), 3000);
       setSerialNumber('');
+      setActiveQrCode(null);
+      setIsBoundToQr(false);
       if (serialInputRef.current) {
         serialInputRef.current.value = '';
       }
@@ -916,6 +979,8 @@ function ManualEntryForm({
       setGradingCompany('');
       setGrade('');
       setSerialNumber('');
+      setActiveQrCode(null);
+      setIsBoundToQr(false);
       if (serialInputRef.current) {
         serialInputRef.current.value = '';
       }
@@ -1028,17 +1093,94 @@ function ManualEntryForm({
                 
                 <div className="flex items-center gap-2">
                   <label className="text-sm font-medium text-slate-700">Bind to QR/Serial (Optional):</label>
-                  <input
-                    type="text"
-                    ref={serialInputRef}
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value.toUpperCase())}
-                    placeholder="e.g. SN-001"
-                    className="w-32 bg-white border border-[#e0e0e0] rounded px-2 py-1 text-xs text-gray-900 focus:outline-none focus:border-[#961b2b] uppercase font-mono"
-                    autoFocus
-                  />
+                  <div className="flex items-center gap-1.5 bg-white border border-[#e0e0e0] rounded px-2 py-1 focus-within:border-[#961b2b] transition-all">
+                    <input
+                      type="text"
+                      ref={serialInputRef}
+                      value={serialNumber}
+                      onChange={(e) => {
+                        const val = e.target.value.toUpperCase();
+                        setSerialNumber(val);
+                        setActiveQrCode(val || null);
+                        setIsBoundToQr(false);
+                      }}
+                      placeholder="e.g. SN-001"
+                      className="w-24 bg-transparent border-none text-xs text-gray-900 outline-none focus:ring-0 uppercase font-mono"
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={() => onOpenScanner?.()}
+                      className="p-1 text-slate-400 hover:text-[#961b2b] hover:bg-[#961b2b]/10 rounded transition-colors"
+                      title="Scan QR Code with Camera"
+                    >
+                      <Camera size={13} />
+                    </button>
+                  </div>
                 </div>
               </div>
+
+              {/* QR Code Binding Status Panel */}
+              {activeQrCode && (
+                <div className={`p-4 rounded-xl border transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                  isBoundToQr 
+                    ? 'bg-emerald-50/50 border-emerald-200 text-emerald-800 shadow-sm' 
+                    : errors.qrBindingRequired
+                      ? 'bg-rose-50 border-rose-250 text-rose-800 shadow-[0_0_12px_rgba(220,38,38,0.08)]'
+                      : 'bg-slate-50 border-gray-200 text-slate-800 shadow-sm'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg transition-colors ${
+                      isBoundToQr ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      <QrCodeIcon size={18} />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                        Intake Target Label (Parent SKU)
+                      </span>
+                      <span className="text-sm font-mono font-bold tracking-tight">
+                        {activeQrCode}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {!isBoundToQr ? (
+                      <button
+                        type="button"
+                        onClick={handleBindCardToQr}
+                        disabled={isBinding}
+                        className="flex items-center gap-2 px-5 py-2 text-xs font-bold bg-[#961b2b] text-white rounded-lg hover:bg-[#961b2b]/95 shadow transition-all duration-155 min-h-[38px] disabled:opacity-55 cursor-pointer"
+                      >
+                        {isBinding ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            Verifying...
+                          </>
+                        ) : (
+                          <>
+                            <LinkIcon size={14} />
+                            Bind Card to QR Code
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-2 bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-sm">
+                        <Check size={14} />
+                        ✓ Card Bound Successfully
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {errors.qrBindingRequired && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs font-bold flex items-center gap-2 animate-bounce">
+                  <span>⚠️</span>
+                  <span>You must bind this card to the QR code before saving.</span>
+                </div>
+              )}
 
               {/* Main Fields: Photo upload and basic metadata */}
               <div className="grid grid-cols-1 md:grid-cols-[130px_1fr] gap-6">
@@ -1396,13 +1538,25 @@ function ManualEntryForm({
               Next
             </button>
           ) : (
-            <button
-              onClick={handleSubmit}
-              className="flex items-center gap-2 px-6 py-2 text-xs font-bold bg-[#961b2b] text-gray-100 rounded-lg hover:bg-[#961b2b]/95 shadow-lg shadow-[#961b2b]/15 transition-all duration-150 min-h-[40px]"
-            >
-              <Plus size={15} />
-              Add to Inventory
-            </button>
+            <div className="flex flex-col items-end gap-1">
+              {activeQrCode && !isBoundToQr && (
+                <span className="text-[10px] font-bold text-rose-600 animate-pulse mr-1">
+                  ⚠️ Binding to QR required
+                </span>
+              )}
+              <button
+                onClick={handleSubmit}
+                disabled={activeQrCode ? !isBoundToQr : false}
+                className={`flex items-center gap-2 px-6 py-2 text-xs font-bold rounded-lg shadow-lg transition-all duration-150 min-h-[40px] ${
+                  activeQrCode && !isBoundToQr
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none border border-gray-300'
+                    : 'bg-[#961b2b] text-gray-105 hover:bg-[#961b2b]/95 shadow-[#961b2b]/15 text-white'
+                }`}
+              >
+                <Plus size={15} />
+                Add to Inventory
+              </button>
+            </div>
           )}
         </div>
       </div>

@@ -378,6 +378,7 @@ export default function App() {
               onAddProcurements={handleAddProcurements}
               onNavigateToHistory={() => setCurrentView('procurementHistory')}
               initialSerialNumber={scannedProcurementEvent ? scannedProcurementEvent.code : ''}
+              onOpenScanner={() => setIsGlobalScannerOpen(true)}
             />
           )}
           {currentView === 'procurementHistory' && (
